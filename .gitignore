@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Type checking
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# Testing
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+coverage.xml
+
+# JetBrains IDE
+.idea/
+*.iml
+
+# Cursor / Claude / AI tools
+.cursor/
+.cursorrules
+.windsurfrules
+.claude/
+.mcp.json
+.opencode.json
+
+
+# Code review graph
+.code-review-graph/
+
+# macOS
+.DS_Store
