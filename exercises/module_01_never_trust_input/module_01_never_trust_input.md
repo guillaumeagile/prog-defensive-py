@@ -396,6 +396,42 @@ class ProductInput(BaseModel):
 
 ---
 
+## Mixing Pydantic and Result — an elegant combination
+
+The solution code does something deliberate: it uses two libraries together, each for what it
+does best.
+
+**Pydantic** excels at the mechanical work of boundary parsing — coercion, field constraints,
+nested models. But its error surface is exceptions, which leak implementation details to callers.
+
+**`returns.Result`** gives you an explicit, composable error type. But it has no built-in
+vocabulary for field-level validation rules.
+
+The combination captures the strengths of both:
+
+```python
+# _ProductSchema is private — callers cannot reach it
+# Pydantic's exception-based world is fully contained inside one function
+def parse_product_input(...) -> Result[ProductInput, str]:
+    try:
+        validated = _ProductSchema(...)    # Pydantic does the hard work here
+        return Success(ProductInput(...))  # clean domain object escapes
+    except ValidationError as e:
+        return Failure(...)                # exception converted, never leaks out
+```
+
+The result: **declarative validation rules** (Pydantic) AND **an honest return type** (Result).
+Neither library achieves this alone.
+
+### The trade-off to be aware of
+
+We only surface the **first** validation failure. If you need all errors at once — useful for
+form validation where you want to show the user every problem in one response — you would need
+to map `e.errors()` into a richer error type than `str`. That is a deliberate choice here, not
+an oversight. For API boundaries returning 422, returning all errors is often the right call.
+
+---
+
 ## Key Takeaways (say these out loud at the end)
 
 1. **Validate at the boundary.** Once. Not inside business logic.
@@ -403,6 +439,7 @@ class ProductInput(BaseModel):
 3. **Whitelist what's valid** — never blacklist what's invalid.
 4. **Your intuition about valid data is wrong.** Use libraries, not hand-rolled regexes.
 5. After the boundary, your code should never have to ask "but what if this is None?"
+6. **Pydantic and Result compose elegantly** — use Pydantic for rules, Result for the contract.
 
 ---
 
@@ -419,6 +456,10 @@ class ProductInput(BaseModel):
 
 **Q: What about validating data coming from our own database?**
 > If you control the schema and the write path is validated: trust it. If you're reading from a legacy system, a shared DB, or any external store: validate it. Assume the DB can contain anything.
+
+**Q: Why only return the first error? What if I need all of them?**
+> Map `e.errors()` into a list instead of taking `[0]`. Change the return type to
+> `Result[ProductInput, list[str]]`. The pattern stays the same — only the error payload widens.
 
 ---
 
