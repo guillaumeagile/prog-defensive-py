@@ -1,7 +1,11 @@
+# Approach C — dataclass + __post_init__, no external dependency.
+# Same pattern as Approach B (Result), but without pydantic.
+# Shows the principle is tool-agnostic.
+
 from hypothesis import given, strategies as st
 from returns.result import Failure, Success
 
-from solution import parse_user_input
+from solution_dataclass import parse_user_input
 
 
 class TestParseUserInputName:

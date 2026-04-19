@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+addopts = "--tb=short -q --import-mode=importlib"
+testpaths = ["exercises"]
+
+[tool.hypothesis]
+max_examples = 200
