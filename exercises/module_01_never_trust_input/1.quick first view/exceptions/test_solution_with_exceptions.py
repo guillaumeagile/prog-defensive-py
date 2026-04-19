@@ -1,8 +1,12 @@
+# Tests for Approach A — exception-based validation.
+# Notice: every failure case requires pytest.raises(ValidationError).
+# The test reader must know which exception type Pydantic raises.
+
 import pytest
 from hypothesis import given, strategies as st
 from pydantic import ValidationError
 
-from solution import UserInput  # noqa: does not exist yet — tests fail first
+from solution_with_exceptions import UserInput
 
 
 class TestUserInputName:

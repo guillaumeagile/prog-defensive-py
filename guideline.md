@@ -597,6 +597,11 @@ These rules apply to **all generated code** in this session.
 8. `Maybe/Option` for optional presence. Never return `None` as "not found".
 9. Pydantic models live at the boundary only — never passed into domain logic.
 10. Tests use `assert` directly — no `assertEqual`, no unittest style.
+11. No exceptions as control flow — callers must not need try/except to handle
+    expected failures. Wrap Pydantic's ValidationError internally and surface
+    failures as `Result[T, str]`. Exceptions are for truly unexpected errors only.
+    Goal: readable, maintainable code where the happy path and error path are
+    both explicit in the return type.
 ```
 
 ---

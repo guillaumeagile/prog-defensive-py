@@ -1,3 +1,7 @@
+# Approach A — Pydantic raises exceptions on invalid input.
+# Callers must wrap calls in try/except to handle validation failures.
+# The error path is implicit: nothing in the signature tells you it can fail.
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -20,3 +24,13 @@ class UserInput(BaseModel):
         if "@" not in v:
             raise ValueError("email must contain '@'")
         return v
+
+
+# Caller code — the error path is invisible in the signature:
+#
+#   from pydantic import ValidationError
+#
+#   try:
+#       user = UserInput(name="", age=30, email="alice@example.com")
+#   except ValidationError as e:
+#       print(e)  # only way to know it failed
