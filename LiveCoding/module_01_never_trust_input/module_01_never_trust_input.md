@@ -8,33 +8,28 @@
 | | |
 |---|---|
 | **Duration** | 8 minutes (live) + 5 min exercise if async |
-| **Core principle** | Validate at the boundary. Once. Loudly. |
-| **Python focus** | `pydantic` v2, `dataclasses`, type hints, `__post_init__` |
-| **Audience takeaway** | I know exactly where to put validation, and what tools to reach for |
+| **Core principle** | Parse at the boundary. Surface failures explicitly. |
+| **Python focus** | `pydantic` v2, `returns.Result`, `dataclasses`, type hints, `__post_init__` |
+| **Audience takeaway** | I know where to parse input and how to expose expected failures honestly |
 
 ---
 
 ## How to navigate this folder
 
-This module uses **two different labels**:
+This module is split by **activity**:
 
-- **Part 1/2/3/4/5** = the teaching timeline in this lesson plan
-- **Approach A/B/C** = the validation style used in code examples
+- `LiveCoding/module_01_never_trust_input/` = what you demo live
+- `exercises/module_01_never_trust_input/` = what participants do after the demo
 
-Think of it as:
+### Mapping: live steps and source folders
 
-- **Part = when in the lesson**
-- **Approach = how validation is implemented**
-
-### Mapping: folders, parts, and approaches
-
-| Folder / doc | Where it fits in the lesson | What it covers | Approach labels |
+| Folder / doc | Live step | What it covers | Approach labels |
 |---|---|---|---|
-| `1.quick_first_view/` | Part 3 (Live Code, Steps 1–3) | Compare exception-based vs Result-based boundary parsing | Approach A + B |
-| `2.dataclass_post_init/` | Part 3 (Live Code, Step 4) | Show stdlib-only alternative to Pydantic | Approach C |
-| `3.exercise_product_input/` | Exercise after Part 3 | Apply the same boundary contract to a richer payload | Approach B |
-
-Parts 1, 2, 4, and 5 are mostly facilitator/script content in this file; they do not each have a matching subfolder.
+| `1.quick_first_view/exceptions/` | Step 1 | Exception-based boundary parsing (implicit error path) | Approach A |
+| `1.quick_first_view/results/` | Step 2 | Same validation rules with an explicit `Result` contract | Approach B |
+| `1.quick_first_view/exceptions/processing_chain_with_exceptions.py` + `1.quick_first_view/results/processing_chain_with_results.py` | Step 3 | Larger side-by-side propagation chain comparison | Approach A + B |
+| `2.dataclass_post_init/` | Step 4 | Stdlib-only alternative (`dataclass` + `__post_init__`) | Approach C |
+| `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Exercise | Apply the same boundary contract to a richer payload | Approach B |
 
 ---
 
@@ -43,9 +38,10 @@ Parts 1, 2, 4, and 5 are mostly facilitator/script content in this file; they do
 By the end of this module, participants will be able to:
 
 1. Identify where the **trust boundary** is in any system they work on
-2. Apply **pydantic v2** validators for boundary validation
-3. Distinguish **whitelist** from **blacklist** strategies — and know which to use
-4. Name at least 3 real-world "falsehood" categories that bite developers
+2. Apply **pydantic v2** to parse and coerce raw boundary input
+3. Return expected failures as **`Result[Value, Error]`** instead of leaking exceptions
+4. Distinguish **whitelist** from **blacklist** strategies — and know which to use
+5. Name at least 3 real-world "falsehood" categories that bite developers
 
 ---
 
@@ -54,14 +50,14 @@ By the end of this module, participants will be able to:
 ```
 00:00 — 00:90   Hook: war story or question (90 sec)
 01:30 — 03:00   Concept: what is the boundary? (90 sec)
-03:00 — 06:30   Live code: bad → better → best (3.5 min)
+03:00 — 06:30   Live code: Approaches A/B/C + chain comparison (3.5 min)
 06:30 — 07:30   Whitelist vs blacklist principle (60 sec)
 07:30 — 08:00   Falsehoods + exercise brief (30 sec)
 ```
 
 ---
 
-## Part 1 — Hook (90 sec)
+## Hook (90 sec)
 
 **Open with this question to the room:**
 
@@ -86,7 +82,7 @@ By the end of this module, participants will be able to:
 
 ---
 
-## Part 2 — Concept: The Trust Boundary (90 sec)
+## Concept — The Trust Boundary (90 sec)
 
 **Draw this on a whiteboard or say it verbally:**
 
@@ -100,7 +96,7 @@ By the end of this module, participants will be able to:
 **Key points to make:**
 
 - The boundary is anywhere data **enters** your system: HTTP endpoints, CLI args, message queue consumers, file readers, environment variables, database reads from external sources
-- Validation inside domain logic means you're patching symptoms, not fixing the disease
+- "Validate booleans later" is fragile; **parse now** into trusted typed objects
 - After the boundary, your code should be able to trust its inputs completely — that's the **contract** the boundary enforces
 
 **What counts as "the boundary":**
@@ -117,139 +113,104 @@ db.fetchone()            # external DB (you don't control the schema)
 
 ---
 
-## Part 3 — Live Code (3.5 min)
+## Live Code Walkthrough (3.5 min)
 
-> **Facilitator note**: Type these live. Don't paste. The act of writing them signals "this is simple enough to do in real work."
+> **Facilitator note**: This sequence mirrors exactly what is currently in `LiveCoding/module_01_never_trust_input/`.
 
-### Step 1: The bad code (60 sec)
+### Step 1: Approach A in `1.quick_first_view/exceptions/` (60 sec)
+
+Open `1.quick_first_view/exceptions/solution_with_exceptions.py` and show the constructor call:
 
 ```python
-# ❌ Trusting the caller completely
-def create_user(data: dict):
-    name  = data["name"]
-    age   = data["age"]
-    email = data["email"]
-    db.insert(name=name, age=age, email=email)
+user = UserInput(name="", age=30, email="alice@example.com")
+# raises ValidationError
 ```
 
-**Ask the room:** "What can go wrong here?"
+**Points to land:**
 
-Expected answers to draw out:
-- `data["name"]` raises `KeyError` if key is missing
-- `age` could be `"thirty-two"`, `-1`, `None`, `9999`
-- `email` could be `"not-an-email"` or an empty string
-- `name` could be `""` or `"   "` (whitespace-only)
-- `data` itself could be `None`
-
-**The failure mode isn't a crash here — it's a corrupt database row. That's worse.**
+- Validation rules are declarative and solid (Pydantic model)
+- Failure is still implicit: nothing in the signature tells callers this can fail
+- Every caller must remember `try/except ValidationError`
 
 ---
 
-### Step 2: Naive improvement — still bad (30 sec)
+### Step 2: Approach B in `1.quick_first_view/results/` (75 sec)
+
+Open `1.quick_first_view/results/solution_results.py` and show the boundary function:
 
 ```python
-# ❌ Better, but still fragile — manual, scattered, incomplete
-def create_user(data: dict):
-    if not data:
-        raise ValueError("data is required")
-    if "name" not in data or not data["name"].strip():
-        raise ValueError("name is required")
-    if "age" not in data or not isinstance(data["age"], int):
-        raise ValueError("age must be an integer")
-    # ... this grows forever, never covers all cases
-    db.insert(**data)
+def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
+    try:
+        validated = _UserSchema(name=name, age=age, email=email)
+        return Success(UserInput(name=validated.name, age=validated.age, email=validated.email))
+    except ValidationError as e:
+        first = e.errors()[0]
+        field = str(first["loc"][0])
+        msg = str(first["msg"])
+        return Failure(f"{field}: {msg}")
 ```
 
-**Say:** "This is the path most devs take. It's brittle, it grows, it misses cases, and it mixes validation with logic. There's a better tool."
+**Points to land:**
+
+- Pydantic still performs all field validation and coercion
+- Exceptions are contained at one boundary point
+- The private `_UserSchema` stays at the boundary; callers receive a domain `UserInput`
+- Callers handle `Success`/`Failure` explicitly — no hidden crash path
 
 ---
 
-### Step 3: Pydantic v2 — the right tool (90 sec)
+### Step 3: Larger side-by-side chains in `1.quick_first_view/` (60 sec)
 
-```python
-# ✅ Validation at the boundary with pydantic v2
-from pydantic import BaseModel, Field, field_validator, EmailStr
+Open these paired demos:
 
-class UserInput(BaseModel):
-    name:  str   = Field(..., min_length=1, max_length=100)
-    age:   int   = Field(..., ge=0, le=150)
-    email: EmailStr
+- `exceptions/processing_chain_with_exceptions.py`
+- `results/processing_chain_with_results.py`
 
-    @field_validator("name")
-    @classmethod
-    def strip_and_require(cls, v: str) -> str:
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("name cannot be blank or whitespace-only")
-        return stripped
+They implement the same registration workflow, but:
 
-def create_user(data: dict) -> None:
-    user = UserInput(**data)        # raises ValidationError immediately if invalid
-    db.insert(                      # db layer receives clean, typed, trusted values
-        name=user.name,
-        age=user.age,
-        email=user.email
-    )
-```
-
-**Demo: call these live and show the output**
-
-```python
-# Good input — works cleanly
-create_user({"name": "  Alice  ", "age": 30, "email": "alice@example.com"})
-# name is stored as "Alice" (stripped)
-
-# Bad inputs — all caught immediately with clear messages
-create_user({"name": "",    "age": 30,   "email": "alice@example.com"})
-# ValidationError: name cannot be blank or whitespace-only
-
-create_user({"name": "Bob", "age": -5,   "email": "alice@example.com"})
-# ValidationError: age: Input should be greater than or equal to 0
-
-create_user({"name": "Bob", "age": 30,   "email": "not-an-email"})
-# ValidationError: email: value is not a valid email address
-
-create_user({"name": "Bob", "age": "thirty"})
-# ValidationError: age: Input should be a valid integer
-```
-
-**Key things to say:**
-- One place for all validation logic — the model class
-- Errors are **descriptive and immediate** — not buried three calls later
-- The `db.insert()` call is now completely clean — it gets trusted data or nothing at all
-- `EmailStr` is one import away — don't rewrite email validation yourself
+- Approach A uses layered `try/except` and exception translation
+- Approach B composes with `flow(..., bind(...))`
+- Both reach the same endpoint-style adapters (`create_user_http_endpoint`, `handle_signup_message`), but only Approach B keeps expected failures explicit in return types
 
 ---
 
-### Step 4: Without pydantic — `dataclass` + `__post_init__` (45 sec)
+### Step 4: Approach C in `2.dataclass_post_init/` (45 sec)
 
-> *"If you can't or won't add pydantic to a project, here's the equivalent pattern."*
+Open `2.dataclass_post_init/solution_dataclass.py`:
 
 ```python
-from dataclasses import dataclass
-import re
-
-@dataclass
+@dataclass(frozen=True)
 class UserInput:
-    name:  str
-    age:   int
+    name: str
+    age: int
     email: str
 
-    def __post_init__(self):
-        self.name = self.name.strip()
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", self.name.strip())
         if not self.name:
             raise ValueError("name cannot be blank")
-        if not (0 <= self.age <= 150):
-            raise ValueError(f"age {self.age} is out of range [0, 150]")
-        if not re.match(r"[^@]+@[^@]+\.[^@]+", self.email):
-            raise ValueError(f"invalid email: {self.email}")
 ```
 
-**Say:** "Same idea — validate on construction, fail immediately. Pydantic gives you more for free; `__post_init__` gives you control. Pick based on your project's needs."
+And the parser:
+
+```python
+def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
+    try:
+        return Success(UserInput(name=name, age=age, email=email))
+    except ValueError as e:
+        return Failure(str(e))
+```
+
+**Points to land:**
+
+- Same explicit `Result` contract as Approach B
+- No Pydantic dependency; validation is manual
+- `UserInput` remains an immutable value object (`@dataclass(frozen=True)`)
+- Useful fallback for stdlib-only contexts
 
 ---
 
-## Part 4 — Whitelist vs Blacklist (60 sec)
+## Whitelist vs Blacklist (60 sec)
 
 **The principle:**
 
@@ -290,7 +251,7 @@ class UserInput(BaseModel):
 
 ---
 
-## Part 5 — Falsehoods (30 sec)
+## Falsehoods (30 sec)
 
 > *"The last thing to leave you with: your intuition about 'valid' data is wrong in ways you don't expect."*
 
@@ -310,6 +271,9 @@ class UserInput(BaseModel):
 ---
 
 ## Exercise (solo or pair, 5 min)
+
+Exercise files are in `../../exercises/module_01_never_trust_input/3.exercise_product_input/`.
+Use this section as facilitator notes only.
 
 ### Setup
 
@@ -345,14 +309,13 @@ raw = {
 
 ```python
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
 
 class ProductInput(BaseModel):
     name:        str
     price:       float
     stock:       int
     category:    str
-    description: Optional[str] = None
+    description: str | None = None
 
     # Your validators here
 ```
@@ -376,7 +339,6 @@ ProductInput(name="Bread", price=2.0, stock=50, category="food", description="  
 
 ```python
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
 
 VALID_CATEGORIES = {"electronics", "clothing", "food", "other"}
 
@@ -385,7 +347,7 @@ class ProductInput(BaseModel):
     price:       float          = Field(..., gt=0)
     stock:       int            = Field(..., ge=0)
     category:    str
-    description: Optional[str] = None
+    description: str | None = None
 
     @field_validator("name")
     @classmethod
@@ -405,7 +367,7 @@ class ProductInput(BaseModel):
 
     @field_validator("description")
     @classmethod
-    def blank_to_none(cls, v: Optional[str]) -> Optional[str]:
+    def blank_to_none(cls, v: str | None) -> str | None:
         if v is None:
             return None
         stripped = v.strip()
@@ -458,19 +420,19 @@ an oversight. For API boundaries returning 422, returning all errors is often th
 
 ## Key Takeaways (say these out loud at the end)
 
-1. **Validate at the boundary.** Once. Not inside business logic.
-2. **Pydantic turns validation into a data structure**, not scattered if-statements.
-3. **Whitelist what's valid** — never blacklist what's invalid.
-4. **Your intuition about valid data is wrong.** Use libraries, not hand-rolled regexes.
-5. After the boundary, your code should never have to ask "but what if this is None?"
-6. **Pydantic and Result compose elegantly** — use Pydantic for rules, Result for the contract.
+1. **Parse at the boundary.** Don't pass raw dicts into domain logic.
+2. Keep **Pydantic schemas at the boundary**; map to domain objects immediately.
+3. Expected failures should be **`Result`**, not hidden exception paths.
+4. **Whitelist what's valid** — never blacklist what's invalid.
+5. **Your intuition about valid data is wrong.** Use libraries, not hand-rolled regexes.
+6. After the boundary, your code should never have to ask "but what if this is None?"
 
 ---
 
 ## Common Questions
 
 **Q: Should I validate inside service methods too?**
-> Use `assert` for internal invariants your own code controls. Reserve `pydantic`/`raise` for data coming from outside. The goal is: by the time you reach service logic, you're working with a `UserInput` object you fully trust.
+> Parse and normalize external input at the boundary, then pass trusted domain objects inward. Use `assert` for internal invariants. For expected failures, return `Result` so callers handle them explicitly.
 
 **Q: Isn't pydantic slow? We have a high-throughput service.**
 > Pydantic v2 is written in Rust — it's fast. For ultra-high-throughput validation, benchmark first before optimizing. In most cases it's not your bottleneck.

@@ -1,13 +1,14 @@
-# Module 01 — Part 3 Conclusion: Two Approaches to Boundary Validation
+# Module 01 — Conclusion: Two Approaches to Boundary Parsing
 
-We implemented the same validation logic twice. Here is why one is cleaner than the other.
+We implemented the same boundary parser twice. Here is why one is cleaner than the other.
 
 ---
 
 ## Where this fits in Module 01
 
-- **Lesson timeline:** Part 3 (Live Code, Steps 1–3)
+- **Live step:** `1.quick_first_view/` (comparison pass)
 - **Approaches covered here:** Approach A and Approach B
+- **Concepts reinforced:** parse, don't validate; explicit failure contracts
 - **Next step:** `../2.dataclass_post_init/` introduces Approach C
 - **Larger exception-chain demo:** `exceptions/processing_chain_with_exceptions.py`
 - **Matching Result-chain demo:** `results/processing_chain_with_results.py`
@@ -63,6 +64,8 @@ Clean code is code where **reading the signature is enough** to understand what 
 
 ## The rule going forward
 
+> Parse raw boundary input into trusted typed objects as early as possible.
+>
 > Exceptions are for **unexpected** failures — things that should never happen in normal operation
 > (a bug, a corrupted environment, an unreachable code path).
 >

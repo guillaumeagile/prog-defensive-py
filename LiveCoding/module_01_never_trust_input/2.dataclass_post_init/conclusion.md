@@ -2,9 +2,10 @@
 
 ## Where this fits in Module 01
 
-- **Lesson timeline:** Part 3 (Live Code, Step 4)
+- **Live step:** `2.dataclass_post_init/` (fallback path)
 - **Approach covered here:** Approach C
 - **Compares against:** Approach B (recommended), with no Pydantic dependency
+- **Concepts reinforced:** value objects, parse-don't-validate contract, explicit failures via `Result`
 
 ---
 
@@ -81,4 +82,5 @@ Regardless of the tool — Pydantic or `dataclass` — the contract is identical
 
 > `parse_user_input(...) -> Result[UserInput, str]`
 
-The caller never needs `try/except`. The error path is in the type.
+`UserInput` is still an immutable value object, and the caller never needs `try/except`.
+The error path is in the type.

@@ -69,10 +69,15 @@ def create_user(data: dict):
 
 ## Module 02 — Fail fast, fail loud `~8 min`
 
-> *"A crash at line 3 is better than wrong output at line 3000."*
+> *"If a failure is expected, encode it in the type. If a state is impossible, make it unconstructable."*
 
 ### Concept (2 min)
-Silent failures are the most expensive bugs. Returning `None`, swallowing exceptions, or continuing with invalid state delays the explosion — and corrupts data along the way.
+Silent failures are the most expensive bugs. Returning `None` and continuing with invalid state delays the explosion — and corrupts data along the way.
+
+In this course, **fail loud** means:
+
+1. Expected failures are explicit values (`Result`), not hidden control flow.
+2. Illegal states are unrepresentable (functions only accept already-valid domain types).
 
 ### Live code (5 min)
 
@@ -88,50 +93,130 @@ def process_order(user_id: int):
     send_email(user.email)   # AttributeError: NoneType has no attribute 'email'
 ```
 
-**✅ Better — raise early with context**
+**✅ Better — explicit failures + unrepresentable invalid state**
 ```python
-class UserNotFoundError(ValueError):
-    def __init__(self, user_id: int):
-        super().__init__(f"User {user_id} not found")
-        self.user_id = user_id
+from dataclasses import dataclass
 
-def get_user(user_id: int) -> User:
-    result = db.query(user_id)
-    if not result:
-        raise UserNotFoundError(user_id)
-    return result
+from returns.result import Failure, Result, Success
 
-def process_order(user_id: int):
-    user = get_user(user_id)   # raises immediately with full context
+
+@dataclass(frozen=True)
+class ActiveUser:
+    user_id: int
+    email: str
+
+
+@dataclass(frozen=True)
+class UserNotFound:
+    user_id: int
+
+
+@dataclass(frozen=True)
+class UserInactive:
+    user_id: int
+
+
+GetUserError = UserNotFound | UserInactive
+
+
+def get_active_user(user_id: int) -> Result[ActiveUser, GetUserError]:
+    row = db.query(user_id)
+    if row is None:
+        return Failure(UserNotFound(user_id))
+    if not row.is_active:
+        return Failure(UserInactive(user_id))
+    return Success(ActiveUser(user_id=row.id, email=row.email))
+
+
+def process_order_for_active_user(user: ActiveUser) -> None:
     send_email(user.email)
+
+
+def process_order(user_id: int) -> Result[None, GetUserError]:
+    return get_active_user(user_id).map(process_order_for_active_user)
 ```
 
-**Demo moment**: show the traceback difference — one has context, one doesn't.
+**Demo moment**: call `process_order(999)` and `process_order(inactive_id)`.
+Show `Failure(UserNotFound(...))` / `Failure(UserInactive(...))` — explicit, typed, and impossible to ignore.
 
-### `assert` vs `raise` — quick rule
+### ROP fail-fast (Python + Pydantic)
 ```python
-# assert: invariants in YOUR code (disabled with -O flag)
-assert len(items) > 0, "items must not be empty"
+from pydantic import BaseModel, ValidationError
+from returns.pipeline import flow
+from returns.pointfree import bind
+from returns.result import Failure, Result, Success
 
-# raise: conditions that depend on EXTERNAL input or state
-if user_id <= 0:
-    raise ValueError(f"user_id must be positive, got {user_id}")
+
+class SignupSchema(BaseModel):
+    email: str
+    age: int
+
+
+def parse_signup(raw: dict[str, object]) -> Result[SignupSchema, str]:
+    try:
+        parsed = SignupSchema.model_validate(raw)  # boundary parsing
+        return Success(parsed)
+    except ValidationError as error:
+        first = error.errors()[0]
+        field = str(first["loc"][0])
+        msg = str(first["msg"])
+        return Failure(f"{field}: {msg}")
+
+
+def ensure_adult(data: SignupSchema) -> Result[SignupSchema, str]:
+    if data.age < 18:
+        return Failure("adult only")
+    return Success(data)
+
+
+def create_account(data: SignupSchema) -> Result[str, str]:
+    return Success(f"created:{data.email}")
+
+
+def signup(raw: dict[str, object]) -> Result[str, str]:
+    return flow(
+        parse_signup(raw),
+        bind(ensure_adult),
+        bind(create_account),
+    )
 ```
 
-### Custom exception hierarchy
+First `Failure` wins: later steps are skipped automatically, so the pipeline fails fast without hidden exceptions.
+
+### Loud failure rule — quick rule
 ```python
-class AppError(Exception): pass
-class NotFoundError(AppError): pass
-class ValidationError(AppError): pass
-class ExternalServiceError(AppError): pass
-# Callers can catch AppError broadly or specific subtypes
+# Expected domain failures: return Result
+def reserve_stock(sku: str, qty: int) -> Result[None, OutOfStock]:
+    ...
+
+# Unexpected technical failures (bugs/corruption): raise
+raise RuntimeError("unreachable branch hit")
+```
+
+### Illegal states unrepresentable — quick pattern
+```python
+@dataclass(frozen=True)
+class DraftOrder:
+    order_id: str
+
+
+@dataclass(frozen=True)
+class ConfirmedOrder:
+    order_id: str
+
+
+def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
+    ...
+
+# No "is_confirmed: bool" flags, no nullable half-state.
+# You cannot call shipped(order) with a DraftOrder by mistake.
 ```
 
 ### ⚔ War story slot
 > *Your story here — e.g. a None that propagated silently into a financial calculation*
 
 ### Exercise (1 min)
-> Refactor this to raise instead of return None:
+> Refactor this to return `Result[Config, ConfigError]` (no `None`, no exception for expected missing file):
 > ```python
 > def parse_config(path: str):
 >     if not os.path.exists(path):
