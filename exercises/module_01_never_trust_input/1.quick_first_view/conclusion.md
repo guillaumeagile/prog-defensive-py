@@ -1,10 +1,20 @@
-# Module 01 — Partial Conclusion: Two Approaches to Boundary Validation
+# Module 01 — Part 3 Conclusion: Two Approaches to Boundary Validation
 
 We implemented the same validation logic twice. Here is why one is cleaner than the other.
 
 ---
 
-## Approach A — Exceptions (solution_with_exceptions.py)
+## Where this fits in Module 01
+
+- **Lesson timeline:** Part 3 (Live Code, Steps 1–3)
+- **Approaches covered here:** Approach A and Approach B
+- **Next step:** `../2.dataclass_post_init/` introduces Approach C
+- **Larger exception-chain demo:** `exceptions/processing_chain_with_exceptions.py`
+- **Matching Result-chain demo:** `results/processing_chain_with_results.py`
+
+---
+
+## Approach A — Exceptions (`exceptions/solution_with_exceptions.py`)
 
 ```python
 user = UserInput(name="", age=30, email="alice@example.com")
@@ -18,7 +28,7 @@ They must wrap every call in `try/except ValidationError` — or forget to, and 
 
 ---
 
-## Approach B — Result (solution.py)
+## Approach B — Result (`results/solution_results.py`)
 
 ```python
 result = parse_user_input(name="", age=30, email="alice@example.com")

@@ -1,5 +1,13 @@
 # Module 01 — Conclusion: dataclass + __post_init__
 
+## Where this fits in Module 01
+
+- **Lesson timeline:** Part 3 (Live Code, Step 4)
+- **Approach covered here:** Approach C
+- **Compares against:** Approach B (recommended), with no Pydantic dependency
+
+---
+
 ## What this approach shows
 
 Approach B (Pydantic + Result) is the recommended path. But it requires an external dependency.

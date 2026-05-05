@@ -1,5 +1,13 @@
 # Module 01 — Conclusion: ProductInput Exercise
 
+## Where this fits in Module 01
+
+- **Lesson timeline:** Exercise after Part 3
+- **Approach used here:** Approach B (Pydantic + Result)
+- **Purpose:** Apply the same boundary contract to a richer input model
+
+---
+
 ## What this exercise adds
 
 `UserInput` was a warm-up: three fields, straightforward constraints.

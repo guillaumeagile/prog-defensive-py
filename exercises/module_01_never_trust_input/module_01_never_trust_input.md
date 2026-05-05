@@ -14,6 +14,30 @@
 
 ---
 
+## How to navigate this folder
+
+This module uses **two different labels**:
+
+- **Part 1/2/3/4/5** = the teaching timeline in this lesson plan
+- **Approach A/B/C** = the validation style used in code examples
+
+Think of it as:
+
+- **Part = when in the lesson**
+- **Approach = how validation is implemented**
+
+### Mapping: folders, parts, and approaches
+
+| Folder / doc | Where it fits in the lesson | What it covers | Approach labels |
+|---|---|---|---|
+| `1.quick_first_view/` | Part 3 (Live Code, Steps 1–3) | Compare exception-based vs Result-based boundary parsing | Approach A + B |
+| `2.dataclass_post_init/` | Part 3 (Live Code, Step 4) | Show stdlib-only alternative to Pydantic | Approach C |
+| `3.exercise_product_input/` | Exercise after Part 3 | Apply the same boundary contract to a richer payload | Approach B |
+
+Parts 1, 2, 4, and 5 are mostly facilitator/script content in this file; they do not each have a matching subfolder.
+
+---
+
 ## Learning Objectives
 
 By the end of this module, participants will be able to:
