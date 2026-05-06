@@ -7,6 +7,25 @@
 
 ---
 
+## A tale of two worldviews
+
+This guide deliberately shows both the **Pythonic idiom** and the **FP-consistent idiom** side by side, because you will encounter both in the wild and you need to be able to reason about the trade-offs.
+
+| | Pythonic Python | FP-consistent Python |
+|---|---|---|
+| Expected failure | `raise ValueError` / return `None` | `return Failure(...)` |
+| Constructor validation | `__post_init__` raises | smart constructor returns `Result` |
+| Control flow | `try / except` at each call site | `bind` chains, one handler at the top |
+| Signature honesty | `def f(x) -> User` (lies — can raise) | `def f(x) -> Result[User, E]` (whole truth) |
+
+Neither is universally right. The Pythonic way is shorter and familiar to every Python dev. The FP way is more honest, more composable, and scales better when error paths get complex. Knowing *why* they diverge is what this guide is really teaching.
+
+The rule used throughout:
+- **Domain / expected failures** (user error, missing record, age < 18) → `Result`
+- **Programming errors / true invariant violations** (corrupted DB row, unreachable branch) → `raise`
+
+---
+
 ## Before you start
 
 - Open a Python REPL or notebook alongside this guide
@@ -33,43 +52,120 @@ def create_user(data: dict):
     db.insert(name=name, age=age)
 ```
 
-**✅ Better — validate at the boundary**
+**✅ Pythonic — validate at the boundary with Pydantic**
 ```python
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 class UserInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     age:  int  = Field(..., ge=0, le=150)
 
-    @validator("name")
-    def no_empty_name(cls, v):
+    @field_validator("name")
+    @classmethod
+    def no_empty_name(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("name cannot be blank")
         return v.strip()
 
-def create_user(data: dict):
+def create_user(data: dict) -> None:
     user = UserInput(**data)   # raises ValidationError early, not later
     db.insert(name=user.name, age=user.age)
 ```
 
 **Demo moment**: call `create_user({"name": "", "age": -5})` — show the error is clear and early.
 
+---
+
+> ### FP perspective: why `raise` in a constructor is a lie
+>
+> **How `@field_validator` actually works**: when you call `UserInput(**data)`, Pydantic
+> generates an `__init__` that runs all validators in sequence. Your `@field_validator("name")`
+> is injected into that `__init__`. The `raise ValueError(...)` inside the validator is caught
+> by Pydantic and re-raised as a `ValidationError` — so from outside, the constructor either
+> returns a `UserInput` or blows up.
+>
+> This connects to a broader principle — *constructors should be logic-free*:
+>
+> | Tradition | How they say it |
+> |---|---|
+> | Misko Hevery (Google / Angular) | "Constructors do no work" |
+> | FP / type theory | "Constructors are total; parsing is separate" |
+> | Parse don't validate (Alexis King) | "Convert unstructured data into structured data exactly once, at the boundary" |
+> | DDD | "Use factory methods, not constructors, for domain object creation" |
+>
+> They all say the same thing: **construction and validation are two different operations**.
+> Conflating them into `__init__` creates a partial function — one defined only on valid inputs,
+> yet whose signature claims to work on all inputs.
+>
+> The FP person looking at `UserInput(**data)` asks: *"What is the return type of this call?"*
+> The answer is `UserInput` — but that is only true if the input is valid.
+> If the input is invalid it raises. So the real type is `UserInput | raises ValidationError`.
+> Python's type system cannot express `| raises`, which means the signature **lies by omission**.
+>
+> The FP-consistent fix is a **smart constructor** — a plain function, not a class constructor,
+> that makes the failure explicit in its return type:
+>
+> ```python
+> from pydantic import BaseModel, Field, ValidationError, field_validator
+> from returns.result import Result, Success, Failure
+>
+>
+> class UserInput(BaseModel):
+>     name: str = Field(..., min_length=1, max_length=100)
+>     age:  int  = Field(..., ge=0, le=150)
+>
+>     @field_validator("name")
+>     @classmethod
+>     def no_empty_name(cls, v: str) -> str:
+>         if not v.strip():
+>             raise ValueError("name cannot be blank")
+>         return v.strip()
+>
+>
+> def parse_user(data: dict) -> Result[UserInput, str]:
+>     """Smart constructor: the only way to get a UserInput."""
+>     try:
+>         return Success(UserInput(**data))
+>     except ValidationError as e:
+>         first = e.errors()[0]
+>         return Failure(f"{first['loc'][0]}: {first['msg']}")
+>
+>
+> def create_user(data: dict) -> Result[None, str]:
+>     return parse_user(data).map(
+>         lambda user: db.insert(name=user.name, age=user.age)
+>     )
+> ```
+>
+> Now the signature of `parse_user` tells the whole truth: it either succeeds with a `UserInput`
+> or fails with a string message. No caller needs a `try/except`.
+>
+> **Which to choose?**
+> The raising version is fine when `create_user` is a web endpoint and your framework already
+> catches `ValidationError` and turns it into a 422. The `Result` version is better when you
+> compose multiple parsing steps or when the failure needs to propagate through several layers
+> without sprinkling `try/except` everywhere.
+
+---
+
 ### Key points to say out loud
 - Whitelist what's valid, don't blacklist what's bad
-- Type hints document intent; pydantic/dataclasses *enforce* it at runtime
+- Type hints document intent; Pydantic *enforces* it at runtime
 - Falsehoods programmers believe: names with spaces, ages as strings, "valid" email formats
+- If your framework handles `ValidationError` for you, the Pythonic version is perfectly fine — the smart constructor shines when you own the error path
 
 ### ⚔ War story slot
 > *Your story here — e.g. a None slipping through unvalidated input that corrupted a record three hops later*
 
 ### Exercise (1 min)
-> Add a `email` field to `UserInput` that rejects addresses without an `@` symbol.
+> Add an `email` field to `UserInput` that rejects addresses without an `@` symbol.
+> Then write a `parse_user` smart constructor that returns `Result[UserInput, str]`.
 
 ---
 
 ## Module 02 — Fail fast, fail loud `~8 min`
 
-> *"If a failure is expected, encode it in the type. If a state is impossible, make it unconstructable."*
+> *"If a failure is expected, encode it in the type."*
 
 ### Concept (2 min)
 Silent failures are the most expensive bugs. Returning `None` and continuing with invalid state delays the explosion — and corrupts data along the way.
@@ -77,7 +173,7 @@ Silent failures are the most expensive bugs. Returning `None` and continuing wit
 In this course, **fail loud** means:
 
 1. Expected failures are explicit values (`Result`), not hidden control flow.
-2. Illegal states are unrepresentable (functions only accept already-valid domain types).
+2. The error path is visible in signatures and impossible to ignore by accident.
 
 ### Live code (5 min)
 
@@ -139,6 +235,28 @@ def process_order(user_id: int) -> Result[None, GetUserError]:
 **Demo moment**: call `process_order(999)` and `process_order(inactive_id)`.
 Show `Failure(UserNotFound(...))` / `Failure(UserInactive(...))` — explicit, typed, and impossible to ignore.
 
+---
+
+> ### FP perspective: why the error ADT matters more than the Result wrapper
+>
+> The Pythonic alternative would be a custom exception hierarchy:
+> ```python
+> class UserNotFoundError(Exception): ...
+> class UserInactiveError(Exception): ...
+> ```
+> Both approaches name the failure cases. The difference is **where the compiler helps you**.
+>
+> With exceptions, a caller that forgets to handle `UserInactiveError` compiles and runs fine —
+> the error silently propagates up the stack until something catches `Exception`.
+> With `Result[ActiveUser, UserNotFound | UserInactive]`, a type checker (pyright/mypy) forces
+> the caller to inspect the result before using the value. You cannot accidentally treat a
+> `Failure(UserInactive(...))` as an `ActiveUser`.
+>
+> The FP term is **making illegal states unrepresentable at the call site**, not just at
+> the construction site.
+
+---
+
 ### ROP fail-fast (Python + Pydantic)
 ```python
 from pydantic import BaseModel, ValidationError
@@ -193,24 +311,9 @@ def reserve_stock(sku: str, qty: int) -> Result[None, OutOfStock]:
 raise RuntimeError("unreachable branch hit")
 ```
 
-### Illegal states unrepresentable — quick pattern
-```python
-@dataclass(frozen=True)
-class DraftOrder:
-    order_id: str
-
-
-@dataclass(frozen=True)
-class ConfirmedOrder:
-    order_id: str
-
-
-def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
-    ...
-
-# No "is_confirmed: bool" flags, no nullable half-state.
-# You cannot call shipped(order) with a DraftOrder by mistake.
-```
+### Bridge to Module 03
+In Module 03, we turn invariants into explicit contracts and then push them further with
+**illegal states unrepresentable** (type-level contracts).
 
 ### ⚔ War story slot
 > *Your story here — e.g. a None that propagated silently into a financial calculation*
@@ -227,79 +330,205 @@ def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
 
 ## Module 03 — Contracts & invariants `~8 min`
 
-> *"What must always be true? Write it down. Then enforce it."*
+> *"A contract says who guarantees what. Invariants are one part of that contract."*
+
+### Aim (1 min)
+By the end of this module, the audience should be able to distinguish and enforce:
+
+- Function contracts (**preconditions + postconditions**)
+- Class invariants (**must always hold after construction and after each mutation**)
+- Type-level contracts (**illegal states unrepresentable**)
 
 ### Concept (2 min)
-An **invariant** is a condition that must hold throughout an object's lifetime. A **precondition** is what must be true before a function runs. Write them down — they become free regression tests.
+A **contract** has three parts:
+
+1. **Preconditions** — what the caller must provide.
+2. **Postconditions** — what the function promises to return/guarantee.
+3. **Invariants** — what must always stay true for valid objects.
+
+`Illegal states unrepresentable` is the strongest contract form: invalid combinations cannot be constructed.
+
+Rule of thumb for teaching and design:
+
+1. If a rule is about **one value**, encode it as a **Value Object**.
+2. If a rule is about **relationships between fields**, enforce a **class invariant**.
+3. If a rule is about **lifecycle/states**, encode it in **types/state variants**.
 
 ### Live code (5 min)
 
-**Guard clauses over nested conditionals**
+**Function contract = guard clauses + explicit postcondition**
 ```python
-# ❌ Arrow anti-pattern
-def process(order):
-    if order:
-        if order.items:
-            if order.user:
-                if order.user.is_active:
-                    # actual logic buried here
-                    pass
+from returns.result import Failure, Result, Success
 
-# ✅ Guard clauses — fail early, happy path is flat
-def process(order):
-    if not order:
-        raise ValueError("order is required")
-    if not order.items:
-        raise ValueError("order has no items")
-    if not order.user:
-        raise ValueError("order has no user")
-    if not order.user.is_active:
-        raise ValueError(f"user {order.user.id} is inactive")
 
-    # actual logic here — flat and readable
+def compute_discount(price: float, pct: float) -> Result[float, str]:
+    if price < 0:
+        return Failure("price must be >= 0")
+    if not (0 <= pct <= 100):
+        return Failure("pct must be between 0 and 100")
+    return Success(price * (1 - pct / 100))
 ```
 
-**Immutability as defence**
+- Preconditions: `price >= 0`, `0 <= pct <= 100`
+- Postcondition: caller always gets a `Result` (no hidden `None`)
+
+---
+
+**Value Object — two styles**
+
+The Pythonic style uses `__post_init__` to raise:
+
+```python
+# Pythonic: raises on bad input
+@dataclass(frozen=True)
+class PositiveAmount:
+    value: float
+
+    def __post_init__(self) -> None:
+        if self.value <= 0:
+            raise ValueError("amount must be positive")
+```
+
+> **FP perspective — why `__post_init__` raising is a partial function**
+>
+> `PositiveAmount(value=-1)` looks like a normal constructor call.
+> Its apparent return type is `PositiveAmount`. But for negative input it raises instead.
+> That makes it a **partial function**: defined only on a subset of its input domain,
+> yet the signature claims to be total.
+>
+> A total constructor either succeeds or returns an explicit failure — never raises for
+> domain validation. The FP-consistent version uses a smart constructor:
+>
+> ```python
+> # FP-consistent: smart constructor, total function
+> @dataclass(frozen=True)
+> class PositiveAmount:
+>     value: float  # private by convention — only create via PositiveAmount.create()
+>
+>     @classmethod
+>     def create(cls, value: float) -> Result["PositiveAmount", str]:
+>         if value <= 0:
+>             return Failure(f"amount must be positive, got {value}")
+>         return Success(cls(value=value))
+> ```
+>
+> Now every caller is forced by the type system to handle the failure case before touching
+> the `PositiveAmount`. No `try/except` needed anywhere — the failure is just a `Failure`.
+>
+> **Which to choose?**
+> If `PositiveAmount` is only ever constructed from already-validated data (e.g., from your DB
+> schema), the raising version is fine — it guards against programming errors, not user errors.
+> Use the smart constructor when the value comes from user input or external data.
+
+---
+
+**Class invariant pattern (for cross-field / state rules)**
+
+```python
+# Pythonic: mutable object, invariant checked after each transition
+@dataclass
+class BankAccount:
+    _balance: float = 0.0
+
+    def __post_init__(self) -> None:
+        self._ensure_invariant()
+
+    def _ensure_invariant(self) -> None:
+        if self._balance < 0:
+            raise ValueError("invariant: balance cannot be negative")
+
+    def deposit(self, amount: PositiveAmount) -> None:
+        self._balance += amount.value
+        self._ensure_invariant()
+
+    def withdraw(self, amount: PositiveAmount) -> None:
+        if amount.value > self._balance:
+            raise ValueError("insufficient funds")
+        self._balance -= amount.value
+        self._ensure_invariant()
+```
+
+> **FP perspective — make the failure explicit at the call site**
+>
+> `withdraw` raises for an expected domain event (insufficient funds).
+> The FP-consistent version returns `Result` so the caller sees the failure in the type:
+>
+> ```python
+> @dataclass(frozen=True)
+> class InsufficientFunds:
+>     requested: float
+>     available: float
+>
+>
+> @dataclass
+> class BankAccount:
+>     _balance: float = 0.0
+>
+>     def deposit(self, amount: PositiveAmount) -> None:
+>         self._balance += amount.value  # always succeeds given PositiveAmount
+>
+>     def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
+>         if amount.value > self._balance:
+>             return Failure(InsufficientFunds(
+>                 requested=amount.value, available=self._balance
+>             ))
+>         self._balance -= amount.value
+>         return Success(None)
+> ```
+>
+> The invariant `_balance >= 0` now holds **by construction** — `withdraw` simply refuses
+> to go below zero and tells the caller why, rather than raising after the fact.
+> No external `_ensure_invariant()` call needed because the mutation only happens on the
+> `Success` branch.
+
+---
+
+Pattern to say out loud:
+1. Check invariant after construction.
+2. Push single-value preconditions into Value Objects (`PositiveAmount`).
+3. Re-check invariant after each state transition.
+4. For **domain failures** (expected, recoverable), prefer `Result` over `raise`.
+5. Reserve `raise` for **programming errors** — conditions that should never happen if the code is correct.
+
+**Illegal states unrepresentable (type-level contract)**
 ```python
 from dataclasses import dataclass
 
-# ❌ Mutable — anyone can mutate shared config
-@dataclass
-class Config:
-    db_url: str
-    max_retries: int
 
-# ✅ Frozen — immutable after construction
+@dataclass(frozen=True)
+class DraftOrder:
+    order_id: str
+
+
+@dataclass(frozen=True)
+class ConfirmedOrder:
+    order_id: str
+
+
+def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
+    ...
+
+# No "is_confirmed: bool" flags, no nullable half-state.
+# `ship(order: ConfirmedOrder)` cannot be called with DraftOrder.
+```
+
+**Immutability as contract amplifier**
+```python
 @dataclass(frozen=True)
 class Config:
     db_url: str
     max_retries: int
 ```
 
-**Class invariant pattern**
-```python
-@dataclass
-class BankAccount:
-    _balance: float = 0.0
-
-    def deposit(self, amount: float):
-        assert amount > 0, "deposit amount must be positive"
-        self._balance += amount
-        assert self._balance >= 0, "invariant: balance cannot be negative"
-
-    def withdraw(self, amount: float):
-        if amount > self._balance:
-            raise ValueError("insufficient funds")
-        self._balance -= amount
-        assert self._balance >= 0, "invariant: balance cannot be negative"
-```
+Once created, `Config` cannot drift into an invalid state through accidental mutation.
 
 ### Exercise (1 min)
-> Add a precondition to this function:
-> ```python
-> def compute_discount(price: float, pct: float) -> float:
->     return price * (1 - pct / 100)
-> ```
+> Pick one function in your codebase and write down:
+> 1) one precondition,
+> 2) one postcondition,
+> 3) one invariant.
+>
+> Then enforce each one explicitly in code — and decide for each: `raise` or `Result`?
 
 ---
 
@@ -412,14 +641,49 @@ import os
 if os.path.exists(path):
     with open(path) as f:    # FileNotFoundError possible here
         data = f.read()
+```
 
-# ✅ Ask forgiveness, not permission
+**Pythonic fix — ask forgiveness, not permission**
+```python
+# Pythonic: exception used for control flow
 try:
     with open(path) as f:
         data = f.read()
 except FileNotFoundError:
     data = None
 ```
+
+> **FP perspective — the Pythonic fix still hides the failure**
+>
+> The `try/except` solves the race but introduces a new problem: `data` is now
+> `str | None`, and a caller that forgets to check for `None` crashes later with an
+> `AttributeError` — the exact silent-failure pattern Module 02 warns against.
+>
+> The FP-consistent fix keeps the "ask forgiveness" idea but makes the absence explicit
+> in the return type:
+>
+> ```python
+> from returns.result import Result, Success, Failure
+>
+>
+> def read_file(path: str) -> Result[str, FileNotFoundError]:
+>     try:
+>         with open(path) as f:
+>             return Success(f.read())
+>     except FileNotFoundError as e:
+>         return Failure(e)
+> ```
+>
+> Now the caller *cannot* use the content without first handling the missing-file case.
+> The `try/except` is still there — Python still needs it to detect the race —
+> but the failure is surfaced in the type rather than silently replaced with `None`.
+>
+> **Which to choose?**
+> If `data = None` flows into a single `if data:` branch right below, the Pythonic version
+> is fine — it's readable and the scope is tiny. Use `Result` when the content will travel
+> through multiple layers before being consumed.
+
+---
 
 **asyncio: the silent fire-and-forget trap**
 ```python
@@ -481,7 +745,8 @@ INPUTS
 FAILURES
   [ ] No bare `except:` or `except Exception: pass`
   [ ] Functions return meaningful types — no None-as-error
-  [ ] Custom exceptions with context, not generic RuntimeError
+  [ ] Expected domain failures use Result, not raise
+  [ ] Custom exceptions reserved for programming errors / infrastructure failures
 
 EXTERNAL CALLS
   [ ] Every HTTP/DB call has a timeout
@@ -497,6 +762,7 @@ INVARIANTS
   [ ] Preconditions documented and enforced
   [ ] Guard clauses at the top, happy path flat
   [ ] Mutable shared objects replaced with frozen ones where feasible
+  [ ] Smart constructors used when invalid construction is a domain failure
 ```
 
 ### Live audit exercise (5 min)
@@ -525,6 +791,22 @@ def transfer_funds(from_id, to_id, amount):
 - `notify_service.send()` is a fire-and-forget external call with no timeout/retry
 - Always returns `True` — even if nothing happened
 
+**FP bonus question**: what would the signature of a correct `transfer_funds` look like?
+```python
+@dataclass(frozen=True)
+class TransferFailed:
+    reason: str
+
+def transfer_funds(
+    from_id: int,
+    to_id: int,
+    amount: PositiveAmount,
+) -> Result[None, TransferFailed]:
+    ...
+```
+The `PositiveAmount` type eliminates the negative/zero amount bug before the function body even runs.
+The `Result` return makes it impossible for callers to ignore a failed transfer.
+
 ### Closing 1-liner to leave on screen
 > *"Defensive code isn't pessimism. It's respect for the system's actual operating conditions."*
 
@@ -534,10 +816,12 @@ def transfer_funds(from_id, to_id, amount):
 
 - *A Philosophy of Software Design* — John Ousterhout (Chapter 10: Define Errors Out Of Existence)
 - *Designing Distributed Systems* — Brendan Burns (idempotency, circuit breakers)
+- *Domain Modelling Made Functional* — Scott Wlaschin (the canonical reference for illegal states unrepresentable, smart constructors, and Result-based pipelines)
+- Python `returns` library — `Result`, `bind`, `flow` for Python
 - Python `tenacity` library — production-grade retry decorator
 - Python `pydantic` v2 docs — validation at the boundary
 - Falsehoods Programmers Believe About Names — kalzumeus.com
 
 ---
 
-*Guide version 1.0 — expand war stories before the session*
+*Guide version 1.1 — expand war stories before the session*
