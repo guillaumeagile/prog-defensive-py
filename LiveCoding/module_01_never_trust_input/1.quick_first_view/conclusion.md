@@ -10,6 +10,7 @@ We implemented the same boundary parser twice. Here is why one is cleaner than t
 - **Approaches covered here:** Approach A and Approach B
 - **Concepts reinforced:** parse, don't validate; explicit failure contracts
 - **Next step:** `../2.dataclass_post_init/` introduces Approach C
+- **Optional next step:** `../3.result_stronger_types/` introduces Approach D (`Result[T, ErrorADT]`)
 - **Larger exception-chain demo:** `exceptions/processing_chain_with_exceptions.py`
 - **Matching Result-chain demo:** `results/processing_chain_with_results.py`
 
@@ -71,5 +72,7 @@ Clean code is code where **reading the signature is enough** to understand what 
 >
 > Expected failures — invalid input, missing records, constraint violations — belong in the
 > **return type**. Use `Result[T, str]`. Make the contract visible.
+
+When string errors stop being enough, upgrade to `Result[T, ErrorADT]` (Approach D).
 
 This is the foundation that all subsequent modules build on.

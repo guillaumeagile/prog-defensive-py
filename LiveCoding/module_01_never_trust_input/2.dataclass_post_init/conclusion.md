@@ -6,6 +6,7 @@
 - **Approach covered here:** Approach C
 - **Compares against:** Approach B (recommended), with no Pydantic dependency
 - **Concepts reinforced:** value objects, parse-don't-validate contract, explicit failures via `Result`
+- **Optional extension:** `../3.result_stronger_types/` (Approach D) for typed error ADTs
 
 ---
 

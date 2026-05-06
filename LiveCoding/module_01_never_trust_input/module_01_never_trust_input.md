@@ -29,6 +29,7 @@ This module is split by **activity**:
 | `1.quick_first_view/results/` | Step 2 | Same validation rules with an explicit `Result` contract | Approach B |
 | `1.quick_first_view/exceptions/processing_chain_with_exceptions.py` + `1.quick_first_view/results/processing_chain_with_results.py` | Step 3 | Larger side-by-side propagation chain comparison | Approach A + B |
 | `2.dataclass_post_init/` | Step 4 | Stdlib-only alternative (`dataclass` + `__post_init__`) | Approach C |
+| `3.result_stronger_types/` | Optional Step 5 | FP-style extension with typed error ADT (`Result[T, ErrorADT]`) | Approach D |
 | `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Exercise | Apply the same boundary contract to a richer payload | Approach B |
 
 ---
@@ -207,6 +208,28 @@ def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
 - No Pydantic dependency; validation is manual
 - `UserInput` remains an immutable value object (`@dataclass(frozen=True)`)
 - Useful fallback for stdlib-only contexts
+
+---
+
+### Optional Step 5: Approach D in `3.result_stronger_types/` (60 sec)
+
+Open `3.result_stronger_types/solution_stronger_types.py`:
+
+```python
+ParseUserError = PayloadError | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
+
+def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
+    return flow(
+        parse_raw_user_input(raw_payload),
+        bind(lambda raw: parse_user_input(raw.name, raw.age, raw.email)),
+    )
+```
+
+**Points to land:**
+
+- Same fail-fast behavior as Approach B, but failures are typed (not `str`)
+- Caller can pattern-match on failure variants safely
+- Stronger contracts help when UI/API behavior depends on specific failure kinds
 
 ---
 
