@@ -1,0 +1,9 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.12",
+  "include": [
+    "solution_more_fp_style.py"
+  ],
+  "reportUnknownArgumentType": "none",
+  "reportUnknownMemberType": "none"
+}

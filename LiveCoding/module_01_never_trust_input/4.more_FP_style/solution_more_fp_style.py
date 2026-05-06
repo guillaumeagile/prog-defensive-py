@@ -1,11 +1,9 @@
-# Approach D — Result with stronger domain and error types.
-# Keep Pydantic at the boundary, then parse into value objects.
-# Failures are explicit typed values, not string messages.
-
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, ValidationError
+from returns.pipeline import flow
+from returns.pointfree import bind
 from returns.result import Failure, Result, Success
 
 
@@ -79,6 +77,12 @@ class _RawUserInput:
     email: str
 
 
+@dataclass(frozen=True)
+class _NameAge:
+    name: Name
+    age: Age
+
+
 def parse_raw_user_input(raw_payload: dict[str, Any]) -> Result[_RawUserInput, ParseUserError]:
     try:
         parsed = _RawUserSchema.model_validate(raw_payload)
@@ -100,7 +104,6 @@ def parse_name(raw_name: str) -> Result[Name, ParseUserError]:
     return Success(Name(value=stripped))
 
 
-
 def parse_age(raw_age: int) -> Result[Age, ParseUserError]:
     if not (0 <= raw_age <= 150):
         return Failure(AgeOutOfRange(raw_age=raw_age))
@@ -113,32 +116,49 @@ def parse_email(raw_email: str) -> Result[Email, ParseUserError]:
     return Success(Email(value=raw_email))
 
 
+def _parse_age_after_name(name: Name, raw_age: int) -> Result[_NameAge, ParseUserError]:
+    return parse_age(raw_age).map(lambda age: _NameAge(name=name, age=age))
+
+
+def _parse_email_after_name_age(
+    parsed: _NameAge, raw_email: str
+) -> Result[ParsedUserInput, ParseUserError]:
+    return parse_email(raw_email).map(
+        lambda email: ParsedUserInput(name=parsed.name, age=parsed.age, email=email)
+    )
+
+
+def _bind_parse_age(raw_age: int) -> Callable[[Name], Result[_NameAge, ParseUserError]]:
+    def _inner(parsed_name: Name) -> Result[_NameAge, ParseUserError]:
+        return _parse_age_after_name(parsed_name, raw_age)
+
+    return _inner
+
+
+def _bind_parse_email(raw_email: str) -> Callable[[_NameAge], Result[ParsedUserInput, ParseUserError]]:
+    def _inner(parsed: _NameAge) -> Result[ParsedUserInput, ParseUserError]:
+        return _parse_email_after_name_age(parsed, raw_email)
+
+    return _inner
+
+
 def parse_user_input(name: str, age: int, email: str) -> Result[ParsedUserInput, ParseUserError]:
-    parsed_name_result = parse_name(name)
-    if isinstance(parsed_name_result, Failure):
-        return Failure(parsed_name_result.failure())
-    parsed_name = parsed_name_result.unwrap()
+    return flow(
+        parse_name(name),
+        bind(_bind_parse_age(age)),
+        bind(_bind_parse_email(email)),
+    )
 
-    parsed_age_result = parse_age(age)
-    if isinstance(parsed_age_result, Failure):
-        return Failure(parsed_age_result.failure())
-    parsed_age = parsed_age_result.unwrap()
 
-    parsed_email_result = parse_email(email)
-    if isinstance(parsed_email_result, Failure):
-        return Failure(parsed_email_result.failure())
-    parsed_email = parsed_email_result.unwrap()
-
-    return Success(ParsedUserInput(name=parsed_name, age=parsed_age, email=parsed_email))
+def _parse_user_input_from_raw(raw: _RawUserInput) -> Result[ParsedUserInput, ParseUserError]:
+    return parse_user_input(raw.name, raw.age, raw.email)
 
 
 def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
-    parsed_raw_result = parse_raw_user_input(raw_payload)
-    if isinstance(parsed_raw_result, Failure):
-        return Failure(parsed_raw_result.failure())
-
-    raw = parsed_raw_result.unwrap()
-    return parse_user_input(raw.name, raw.age, raw.email)
+    return flow(
+        parse_raw_user_input(raw_payload),
+        bind(_parse_user_input_from_raw),
+    )
 
 
 def render_error(error: ParseUserError) -> str:

@@ -230,7 +230,24 @@ def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, P
 - Same fail-fast behavior as Approach B, but failures are typed (not `str`)
 - Caller can pattern-match on failure variants safely
 - Stronger contracts help when UI/API behavior depends on specific failure kinds
-- Optional static checks (strict): `pyright --project 3.result_stronger_types/pyright.module01.json` and `mypy --config-file 3.result_stronger_types/mypy.module01.ini`
+- Optional static checks (strict, via Poetry): `poetry run pyright --project 3.result_stronger_types/pyright.module01.json` and `poetry run mypy --config-file 3.result_stronger_types/mypy.module01.ini`
+
+---
+
+### Optional Step 6: More FP composition in `4.more_FP_style/` (45 sec)
+
+Open `4.more_FP_style/solution_more_fp_style.py` to show a `flow(..., bind(...))`
+version of the same parsing pipeline.
+
+Use local Pyright config for this folder:
+
+- `poetry run pyright --project 4.more_FP_style/pyright.more_fp_style.json`
+
+Notes:
+
+- Keeps strict checking overall
+- Relaxes only `reportUnknownArgumentType` and `reportUnknownMemberType` for this FP/HKT-heavy file
+- Runtime behavior remains the same as Approach D; this is mostly a composition-style variant
 
 ---
 

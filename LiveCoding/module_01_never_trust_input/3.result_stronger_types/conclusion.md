@@ -79,11 +79,17 @@ Approach D is a good fit for strict static checks because signatures are explici
 - typed error ADT variants (`NameEmpty`, `NameBlank`, ...)
 - exhaustive `render_error` via `assert_never`
 
-Run locally from this folder:
+Install tooling with Poetry (once):
 
 ```bash
-pyright --project pyright.module01.json
-mypy --config-file mypy.module01.ini
+poetry add --group dev pydantic returns hypothesis pytest pyright mypy
+```
+
+Run locally from this folder (via Poetry):
+
+```bash
+poetry run pyright --project pyright.module01.json
+poetry run mypy --config-file mypy.module01.ini
 ```
 
 ---
