@@ -216,7 +216,7 @@ def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
 Open `3.result_stronger_types/solution_stronger_types.py`:
 
 ```python
-ParseUserError = PayloadError | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
+ParseUserError = PayloadError | NameEmpty | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
 
 def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
     return flow(
@@ -230,6 +230,7 @@ def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, P
 - Same fail-fast behavior as Approach B, but failures are typed (not `str`)
 - Caller can pattern-match on failure variants safely
 - Stronger contracts help when UI/API behavior depends on specific failure kinds
+- Optional static checks (strict): `pyright --project 3.result_stronger_types/pyright.module01.json` and `mypy --config-file 3.result_stronger_types/mypy.module01.ini`
 
 ---
 

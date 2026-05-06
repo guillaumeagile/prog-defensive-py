@@ -71,6 +71,23 @@ names are rejected with `NameBlank`, while `""` remains a distinct `NameEmpty` c
 
 ---
 
+## Static checking (optional)
+
+Approach D is a good fit for strict static checks because signatures are explicit:
+
+- `Result[ParsedUserInput, ParseUserError]` at boundaries
+- typed error ADT variants (`NameEmpty`, `NameBlank`, ...)
+- exhaustive `render_error` via `assert_never`
+
+Run locally from this folder:
+
+```bash
+pyright --project pyright.module01.json
+mypy --config-file mypy.module01.ini
+```
+
+---
+
 ## Rule of thumb
 
 Start with `Result[T, str]` for teaching and quick prototypes.

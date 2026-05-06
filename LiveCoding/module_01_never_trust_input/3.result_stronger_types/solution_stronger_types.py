@@ -3,7 +3,7 @@
 # Failures are explicit typed values, not string messages.
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, assert_never
 
 from pydantic import BaseModel, ValidationError
 from returns.pipeline import flow
@@ -162,3 +162,5 @@ def render_error(error: ParseUserError) -> str:
             return f"age must be 0-150, got {raw_age}"
         case EmailMissingAt(raw_email=raw_email):
             return f"email must contain '@': {raw_email!r}"
+        case unhandled:
+            assert_never(unhandled)
