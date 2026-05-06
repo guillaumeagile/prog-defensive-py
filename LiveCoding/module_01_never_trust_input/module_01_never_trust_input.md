@@ -219,10 +219,12 @@ Open `3.result_stronger_types/solution_stronger_types.py`:
 ParseUserError = PayloadError | NameEmpty | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
 
 def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
-    return flow(
-        parse_raw_user_input(raw_payload),
-        bind(lambda raw: parse_user_input(raw.name, raw.age, raw.email)),
-    )
+    parsed_raw_result = parse_raw_user_input(raw_payload)
+    if isinstance(parsed_raw_result, Failure):
+        return Failure(parsed_raw_result.failure())
+
+    raw = parsed_raw_result.unwrap()
+    return parse_user_input(raw.name, raw.age, raw.email)
 ```
 
 **Points to land:**
@@ -239,6 +241,18 @@ def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, P
 Open `4.more_FP_style/solution_more_fp_style.py` to show a `flow(..., bind(...))`
 version of the same parsing pipeline.
 
+
+```python
+ParseUserError = PayloadError | NameEmpty | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
+
+def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
+    return flow(
+        parse_raw_user_input(raw_payload),
+        bind(lambda raw: parse_user_input(raw.name, raw.age, raw.email)),
+    )
+```
+
+
 Use local Pyright config for this folder:
 
 - `poetry run pyright --project 4.more_FP_style/pyright.more_fp_style.json`
@@ -248,6 +262,47 @@ Notes:
 - Keeps strict checking overall
 - Relaxes only `reportUnknownArgumentType` and `reportUnknownMemberType` for this FP/HKT-heavy file
 - Runtime behavior remains the same as Approach D; this is mostly a composition-style variant
+
+---
+
+## Functional Style versus Pyright
+
+`flow(...)` and `bind(...)` are functional-composition choices (from `returns`), but the friction you may feel is mostly with **Pyright inference**, not with runtime behavior. 
+
+HKT-like abstractions can trigger "partially unknown" diagnostics even when the pipeline is correct.
+In practice: keep the FP style when it improves readability, and switch to explicit unwrapping (or localized Pyright relaxations) where typing gets noisy. 
+
+
+
+```mermaid
+flowchart LR
+  subgraph Runtime["Runtime semantics (same behavior)"]
+    A["Untrusted payload"] --> B["Parse at boundary"]
+    B --> C["Result[ParsedUserInput, ParseUserError]"]
+    C -->|Success| D["Trusted domain data"]
+    C -->|Failure| E["Typed error ADT"]
+  end
+
+  subgraph Style["Composition style choices"]
+    S1["Explicit unwrapping"]
+    S2["flow(...) + bind(...)"]
+  end
+
+  subgraph Typing["Pyright static typing ergonomics"]
+    T1["Explicit unwrapping<br/>usually inferred cleanly"]
+    T2["flow/bind (HKT-like)<br/>can trigger partially unknown diagnostics"]
+    T3["Local relaxations<br/>or pipeline refactor"]
+  end
+
+  S1 -. "implements same parse contract" .-> C
+  S2 -. "implements same parse contract" .-> C
+  S1 -.-> T1
+  S2 -.-> T2 --> T3
+```
+
+**HKT quick intuition:** `Higher-Kinded Types` let us abstract over a *generic container shape* (like `Result[...]`) instead of only concrete inner types (like `int` or `str`). 
+
+In Python, this is emulated by libraries, so combinators like `bind` may be runtime-correct but still hard for Pyright to infer perfectly.
 
 ---
 
