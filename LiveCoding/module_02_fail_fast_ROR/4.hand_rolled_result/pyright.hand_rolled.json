@@ -1,0 +1,11 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.12",
+  "include": [
+    "solution_hand_rolled_result.py"
+  ],
+  "exclude": [
+    "test_solution.py",
+    "TestBalanceLookupPBT.py"
+  ]
+}

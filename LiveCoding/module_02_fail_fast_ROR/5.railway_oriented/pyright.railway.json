@@ -1,0 +1,11 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.12",
+  "include": [
+    "solution_railway_oriented.py"
+  ],
+  "exclude": [
+    "test_solution.py",
+    "TestRailwayPBT.py"
+  ]
+}

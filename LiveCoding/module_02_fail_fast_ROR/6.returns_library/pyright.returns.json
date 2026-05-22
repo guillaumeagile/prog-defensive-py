@@ -1,0 +1,11 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.12",
+  "include": [
+    "solution_returns_library.py"
+  ],
+  "exclude": [
+    "test_solution.py",
+    "TestReturnsPBT.py"
+  ]
+}
