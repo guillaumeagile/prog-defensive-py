@@ -148,6 +148,20 @@ def process_withdrawal_flow(user_id: int, amount: Amount) -> Result[Amount, obje
     )
 
 
+def process_withdrawal_flow_from_float(user_id: int, amount_value: float) -> Result[Amount, object]:
+    """
+    Full railway flow that starts from a primitive float and turns it into an Amount
+    before continuing with the rest of the pipeline.
+
+    If the float cannot become a valid Amount, the railway exits immediately.
+    """
+    return flow(
+        amount_value,
+        Amount.create,
+        bind(lambda amount: process_withdrawal_flow(user_id, amount)),
+    )
+
+
 # @safe decorator — bridge from exception world to Result world
 
 @safe

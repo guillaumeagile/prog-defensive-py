@@ -26,6 +26,7 @@ from solution_ror_with_amount import (
     withdraw,
     get_balance_flow,
     process_withdrawal_flow,
+    process_withdrawal_flow_from_float,
 )
 
 
@@ -141,6 +142,33 @@ class TestIntegratedFlows:
         error = result.failure()
         assert isinstance(error.requested, Amount)
         assert isinstance(error.balance, Amount)
+
+
+class TestFullRailwayFromFloat:
+    """Test the full chain from float amount to Amount and then into the railway."""
+
+    def test_valid_float_amount_enters_the_railway(self):
+        """A valid float is converted to Amount and the railway continues."""
+        result = process_withdrawal_flow_from_float(1, 30.0)
+
+        assert isinstance(result, Success)
+        remaining_balance = result.value_or(None)
+        assert isinstance(remaining_balance, Amount)
+        assert remaining_balance.value == 70.0
+
+    def test_negative_float_amount_exits_the_railway_early(self):
+        """An invalid float never reaches the rest of the railway."""
+        result = process_withdrawal_flow_from_float(1, -10.0)
+
+        assert isinstance(result, Failure)
+        assert isinstance(result.failure(), AmountNegative)
+
+    def test_zero_float_amount_exits_the_railway_early(self):
+        """Zero is also rejected before any downstream bind happens."""
+        result = process_withdrawal_flow_from_float(1, 0.0)
+
+        assert isinstance(result, Failure)
+        assert isinstance(result.failure(), AmountZero)
 
 
 

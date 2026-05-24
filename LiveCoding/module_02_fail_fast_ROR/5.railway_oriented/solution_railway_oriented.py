@@ -116,6 +116,10 @@ db = FakeDB()
 # Functions with honest signatures
 
 def get_user(user_id: int) -> Result[User, UserNotFound]:
+    """
+
+    :rtype: Result[User, UserNotFound]
+    """
     user = db.find_user(user_id)
     return Ok(user) if user else Err(UserNotFound(user_id))
 
