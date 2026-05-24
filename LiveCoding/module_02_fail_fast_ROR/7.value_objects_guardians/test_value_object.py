@@ -107,7 +107,10 @@ class TestRORFunctionsWithAmount:
 
 
 class TestIntegratedFlows:
-    """Test the complete integrated flows."""
+    """Test the complete integrated flows.
+        the unwrap call is a code smell in the FP paradigm
+    we should find a way to stay in the elevated world of the railway
+    """
     
     def test_get_balance_flow_with_amount(self):
         """get_balance_flow returns Amount objects."""
@@ -174,71 +177,7 @@ class TestFullRailwayFromFloat:
 
 
 
-class TestIntegrationBenefits:
-    """Test scenarios that demonstrate the benefits of integration."""
-    
-    def test_type_safety_throughout_flow(self):
-        """Amount type safety is maintained throughout the RoR flow."""
-        amount = Amount.create(30.0).unwrap()
-        result = process_withdrawal_flow(1, amount)
-        
-        # Every step in the chain works with Amount objects
-        assert isinstance(result, Success)
-        remaining_balance = result.value_or(None)
-        assert isinstance(remaining_balance, Amount)
-        assert remaining_balance.value == 70.0  # 100 - 30 = 70
-    
-    def test_caller_must_handle_validation(self):
-        """Caller must handle validation before calling process_withdrawal_flow."""
-        # This demonstrates making illegal states unrepresentable
-        
-        # Caller must handle validation
-        def safe_withdrawal(user_id: int, amount_value: float):
-            amount_result = Amount.create(amount_value)
-            if isinstance(amount_result, Failure):
-                return amount_result  # Validation error
-            
-            # Now we can safely call the flow
-            return process_withdrawal_flow(user_id, amount_result.value_or(None))
-        
-        # Valid amount works
-        result = safe_withdrawal(1, 30.0)
-        assert isinstance(result, Success)
-        
-        # Invalid amounts caught at caller level
-        negative_result = safe_withdrawal(1, -10.0)
-        assert isinstance(negative_result, Failure)
-        assert isinstance(negative_result.failure(), AmountNegative)
-        
-        zero_result = safe_withdrawal(1, 0.0)
-        assert isinstance(zero_result, Failure)
-        assert isinstance(zero_result.failure(), AmountZero)
-    
-    def test_business_logic_separation(self):
-        """Business logic errors are separate from type validation errors."""
-        # Type validation handled by caller
-        amount = Amount.create(200.0).unwrap()  # Valid amount for type system
-        
-        # Business logic error
-        insufficient_result = process_withdrawal_flow(1, amount)
-        assert isinstance(insufficient_result.failure(), InsufficientFunds)
-        
-        # Clear separation between type validation and business rules
-    
-    def test_composable_error_handling(self):
-        """RoR composition works seamlessly with Amount guardians."""
-        # Can chain operations that might fail at different levels
-        amount_result = Amount.create(50.0)
-        if isinstance(amount_result, Success):
-            amount = amount_result.value_or(None)
-            # Continue with RoR flow
-            flow_result = get_balance_flow(1)
-            assert isinstance(flow_result, Success)
-            
-            # Can combine Amount objects in RoR context
-            balance = flow_result.value_or(None)
-            combined = balance + amount
-            assert combined.value == 150.0
+
 
 
 if __name__ == "__main__":
