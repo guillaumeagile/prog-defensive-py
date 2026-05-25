@@ -73,14 +73,16 @@ parse_user_input("", 30, "alice@example.com")
 
 ## Comparing all five approaches
 
-| | A (exceptions) | B (Result + str) | C (dataclass + Result) | D (Result + ADT) | E (value objects + flow) |
-|---|---|---|---|---|---|
-| Error path in signature | No | Yes | Yes | Yes | Yes |
-| Error type | implicit | `str` | `str` | typed ADT | typed ADT |
-| Domain types | raw strings | raw strings | raw strings | raw strings | value objects |
-| Composable pipeline | No | Partially | Partially | Partially | Yes (`flow`/`bind`) |
-| Type-safe field usage | No | No | No | No | Yes |
-| Boilerplate | Low | Low | Medium | Medium | Higher |
+| | A (exceptions)                        | B (Result + str) | C (dataclass + Result) | D (Result + ADT) | E (value objects + flow) |
+|---|---------------------------------------|---|---|---|---|
+| As shown in | 1.quick_first_view/ exceptions/       | `1.quick_first_view/results/` | `2.dataclass_post_init/` | `3.result_stronger_types/` | `4.more_FP_style/` |
+| Key file | DEMO_registration_ with_exceptions.py | `solution_results.py` | `solution_dataclass.py` | `solution_stronger_types.py` | `solution_more_fp_style.py` |
+| Error path in signature | No                                    | Yes | Yes | Yes | Yes |
+| Error type | implicit                              | `str` | `str` | typed ADT | typed ADT |
+| Domain types | raw strings                           | raw strings | raw strings | raw strings | value objects |
+| Composable pipeline | No                                    | Partially | Partially | Partially | Yes (`flow`/`bind`) |
+| Type-safe field usage | No                                    | No | No | No | Yes |
+| Boilerplate | Low                                   | Low | Medium | Medium | Higher |
 
 ---
 

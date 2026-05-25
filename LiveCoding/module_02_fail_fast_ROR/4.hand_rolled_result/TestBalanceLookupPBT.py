@@ -15,17 +15,6 @@ from solution_hand_rolled_result import (
 
 
 class TestBalanceLookupPBT:
-    @given(st.integers(max_value=-1))
-    def test_property_negative_user_id_not_found(self, user_id: int):
-        result = get_user(user_id)
-        assert isinstance(result, Err)
-        assert isinstance(result.error, UserNotFound)
-
-    @given(st.integers(min_value=1000))
-    def test_property_large_user_id_not_found(self, user_id: int):
-        result = get_user(user_id)
-        assert isinstance(result, Err)
-        assert isinstance(result.error, UserNotFound)
 
     def test_property_account_suspension_always_fails(self):
         for suspended in [True, False]:

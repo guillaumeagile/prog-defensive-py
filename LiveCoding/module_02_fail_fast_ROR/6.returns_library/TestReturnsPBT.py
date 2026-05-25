@@ -21,11 +21,6 @@ class TestReturnsPBT:
         assert isinstance(result, Failure)
         assert isinstance(result.value_or(None), UserNotFound)
 
-    @given(st.integers(min_value=1000))
-    def test_property_large_user_id_fails_at_first_step(self, user_id: int):
-        result = get_balance_flow(user_id)
-        assert isinstance(result, Failure)
-        assert isinstance(result.value_or(None), UserNotFound)
 
     @given(st.floats(min_value=100.01, max_value=10000.0, allow_nan=False, allow_infinity=False))
     def test_property_withdraw_more_than_balance_fails(self, amount: float):

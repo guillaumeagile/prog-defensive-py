@@ -549,6 +549,119 @@ pytest tests/payment/ --gateway=stripe
 
 ---
 
+## Part 10 — Testing the Adapter Against a Malfunctioning Provider 
+
+> *"The fake tests the contract. But who tests the adapter — the translation layer between your interface and Stripe's reality? You need a way to simulate Stripe misbehaving, without Stripe."*
+
+### The principle: inject the transport, not the client
+
+The `StripePaymentGateway` depends on `httpx.AsyncClient`. That client is the seam for provider fault injection. Replace it with a controllable transport — no network, full control over what Stripe "returns".
+
+```python
+# httpx lets you inject a custom transport — no monkeypatching required
+import httpx
+
+class FaultyStripeTransport(httpx.AsyncBaseTransport):
+    """Simulates a malfunctioning Stripe at the HTTP transport level."""
+
+    def __init__(self, behaviour: str):
+        self.behaviour = behaviour  # "timeout" | "500" | "200_with_error" | "garbled"
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        match self.behaviour:
+            case "timeout":
+                raise httpx.ReadTimeout("Stripe did not respond", request=request)
+            case "500":
+                return httpx.Response(500, json={"error": {"message": "internal error"}})
+            case "200_with_error":
+                # The classic: HTTP 200, body says error
+                return httpx.Response(200, json={"status": "error", "code": "processing_error"})
+            case "garbled":
+                # Response shape completely wrong — field renamed, missing
+                return httpx.Response(200, json={"charge_id": "ch_123"})  # not StripeCharge shape
+            case _:
+                raise ValueError(f"unknown behaviour: {self.behaviour}")
+```
+
+### The adapter accepts an injectable client
+
+```python
+class StripePaymentGateway:
+    def __init__(self, api_key: str, client: httpx.AsyncClient | None = None):
+        self._client = client or httpx.AsyncClient(
+            base_url="https://api.stripe.com/v1",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=httpx.Timeout(connect=2.0, read=10.0),
+        )
+```
+
+### Provider fault tests — short, explicit, exhaustive
+
+```python
+def make_stripe(behaviour: str) -> StripePaymentGateway:
+    transport = FaultyStripeTransport(behaviour)
+    client = httpx.AsyncClient(
+        base_url="https://api.stripe.com/v1",
+        transport=transport,
+    )
+    return StripePaymentGateway(api_key="sk_test_fake", client=client)
+
+# Principle 1: timeout → PaymentServiceError, never an exception leak
+async def test_adapter_timeout_returns_result():
+    gw = make_stripe("timeout")
+    result = await gw.charge(ChargeRequest(
+        amount_cents=1000, currency="EUR",
+        customer_id="cust_1", idempotency_key="key_1",
+    ))
+    assert isinstance(result, Err)
+    assert isinstance(result.error, PaymentServiceError)
+    assert "timed out" in result.error.message
+
+# Principle 2: 500 → PaymentServiceError, not an unhandled HTTPStatusError
+async def test_adapter_500_returns_result():
+    gw = make_stripe("500")
+    result = await gw.charge(ChargeRequest(
+        amount_cents=1000, currency="EUR",
+        customer_id="cust_1", idempotency_key="key_1",
+    ))
+    assert isinstance(result, Err)
+    assert isinstance(result.error, PaymentServiceError)
+
+# Principle 3: 200 with error body → PaymentServiceError (not Ok)
+async def test_adapter_200_with_error_body():
+    gw = make_stripe("200_with_error")
+    result = await gw.charge(ChargeRequest(
+        amount_cents=1000, currency="EUR",
+        customer_id="cust_1", idempotency_key="key_1",
+    ))
+    assert isinstance(result, Err)   # NOT Ok — the adapter must check the body
+
+# Principle 4: garbled response → PaymentServiceError, never a ValidationError leak
+async def test_adapter_garbled_response():
+    gw = make_stripe("garbled")
+    result = await gw.charge(ChargeRequest(
+        amount_cents=1000, currency="EUR",
+        customer_id="cust_1", idempotency_key="key_1",
+    ))
+    assert isinstance(result, Err)
+    assert isinstance(result.error, PaymentServiceError)
+    # A pydantic ValidationError must never escape the adapter boundary
+```
+
+### The four principles these tests enforce
+
+**1. No exception must escape the adapter.** Timeouts, network errors, HTTP errors — all become `Err(PaymentServiceError(...))`. The business logic never catches httpx exceptions. It never should.
+
+**2. HTTP 200 is not success.** The adapter checks the body. A 200 with an error payload is `Err`, not `Ok`. This is the trap that production incidents are made of.
+
+**3. Schema violations are adapter failures.** If Stripe changes its response shape, pydantic raises `ValidationError`. The adapter catches it and returns `Err(PaymentServiceError(...))`. A `ValidationError` is never the caller's problem.
+
+**4. The transport is the seam for fault injection.** No monkeypatching, no `unittest.mock.patch`. Inject a transport, control the behaviour, test the adapter's response. Clean, explicit, no magic.
+
+
+
+---
+
 ## Circuit Breaker — One Line (15s)
 
 > "For high-volume dependencies, add a circuit breaker around the adapter. `stamina` supports it. When Stripe is down, fail fast — don't retry 3 times × every request in your queue. Give the service room to recover."
