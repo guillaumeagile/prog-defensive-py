@@ -37,20 +37,6 @@ class RegistrationPayload(BaseModel):
     age: int = Field(..., ge=0, le=150)
     email: str = Field(..., min_length=1)
 
-    @field_validator("name")
-    @classmethod
-    def name_not_blank(cls, value: str) -> str:
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("name cannot be blank")
-        return stripped
-
-    @field_validator("email")
-    @classmethod
-    def email_must_contain_at(cls, value: str) -> str:
-        if "@" not in value:
-            raise ValueError("email must contain '@'")
-        return value
 
 
 @dataclass(frozen=True)

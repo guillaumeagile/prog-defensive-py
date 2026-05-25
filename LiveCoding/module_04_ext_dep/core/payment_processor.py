@@ -25,7 +25,7 @@ class PaymentProcessor:
     Coordinates business rules and interacts with outbound ports.
     """
 
-    def __init__(self, gateway: PaymentGateway) -> None:
+    def  __init__(self, gateway: PaymentGateway) -> None:
         self._gateway = gateway
 
     async def process_checkout(
