@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .result import Err, Ok, Result
 from ..ports.dtos import ChargeRequest, ChargeResult, PaymentDeclined, PaymentServiceError
-from ..ports.payment_gateway import PaymentGateway, ChargeOutcome
+from ..ports.payment_gateway import PaymentGateway
 
 # Non-generic logger (specifically configured for this module domain)
 logger = logging.getLogger(__name__)

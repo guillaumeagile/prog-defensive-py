@@ -10,6 +10,7 @@ from .dtos import (
     PaymentServiceError,
     RefundRequest,
     RefundResult,
+    StripeResponse,
 )
 
 ChargeOutcome = Ok[ChargeResult] | Err[PaymentDeclined | PaymentServiceError]
@@ -23,6 +24,6 @@ class PaymentGateway(Protocol):
 
 
 class StripeApi(Protocol):
-    async def create_payment_intent(self, request: ChargeRequest) -> object: ...
+    async def create_payment_intent(self, request: ChargeRequest) -> StripeResponse: ...
 
-    async def create_refund(self, request: RefundRequest) -> object: ...
+    async def create_refund(self, request: RefundRequest) -> StripeResponse: ...

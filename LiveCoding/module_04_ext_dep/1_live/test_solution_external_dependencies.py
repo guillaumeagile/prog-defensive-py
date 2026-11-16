@@ -1,3 +1,7 @@
+import asyncio
+from collections.abc import Coroutine
+from typing import Any
+
 from .core.result import Err, Ok
 from .core.payment_processor import PaymentProcessor, RiskLimitExceeded
 from .ports.dtos import (
@@ -304,9 +308,7 @@ class TestPaymentProcessor:
         assert result.error.limit_cents == 500000
 
 
-def _run(coro):
-    import asyncio
-
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 

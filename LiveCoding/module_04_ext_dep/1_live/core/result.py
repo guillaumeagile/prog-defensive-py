@@ -1,24 +1,26 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import Generic, NoReturn, TypeVar
 
-T = TypeVar("T")
-E = TypeVar("E")
-U = TypeVar("U")
+# Covariants : un `Err[PaymentServiceError]` est aussi un `Err[PaymentDeclined | PaymentServiceError]`.
+# La syntaxe `class Err[E]` donne un paramètre invariant pour une dataclass avec pyright 1.1.414.
+T_co = TypeVar("T_co", covariant=True)
+E_co = TypeVar("E_co", covariant=True)
 
 
 @dataclass(frozen=True)
-class Ok(Generic[T]):
-    value: T
+class Ok(Generic[T_co]):
+    value: T_co
 
-    def map(self, fn: Callable[[T], U]) -> Ok[U]:
+    def map[U](self, fn: Callable[[T_co], U]) -> Ok[U]:
         return Ok(fn(self.value))
 
-    def bind(self, fn: Callable[[T], Result[U, E]]) -> Result[U, E]:
+    def bind[U, E](self, fn: Callable[[T_co], Result[U, E]]) -> Result[U, E]:
         return fn(self.value)
 
-    def unwrap(self) -> T:
+    def unwrap(self) -> T_co:
         return self.value
 
     def is_ok(self) -> bool:
@@ -29,16 +31,16 @@ class Ok(Generic[T]):
 
 
 @dataclass(frozen=True)
-class Err(Generic[E]):
-    error: E
+class Err(Generic[E_co]):
+    error: E_co
 
-    def map(self, fn: Callable[[T], U]) -> Err[E]:
+    def map[T, U](self, fn: Callable[[T], U]) -> Err[E_co]:
         return self
 
-    def bind(self, fn: Callable[[T], Result[U, E]]) -> Err[E]:
+    def bind[T, U, F](self, fn: Callable[[T], Result[U, F]]) -> Err[E_co]:
         return self
 
-    def unwrap(self) -> T:
+    def unwrap(self) -> NoReturn:
         raise RuntimeError(f"unwrap() on Err: {self.error}")
 
     def is_ok(self) -> bool:
@@ -48,4 +50,4 @@ class Err(Generic[E]):
         return True
 
 
-Result = Ok[T] | Err[E]
+type Result[T, E] = Ok[T] | Err[E]

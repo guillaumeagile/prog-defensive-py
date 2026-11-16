@@ -2,6 +2,7 @@
 # Les signatures disent « User », « Account », « float ». Elles mentent par omission.
 #
 # Lancer : python 0_probleme_exceptions_invisibles.py
+# Le script plante sur la première exception, avec sa stack : c'est voulu.
 
 from dataclasses import dataclass
 
@@ -60,20 +61,15 @@ def get_balance(account: Account) -> float:
 
 
 def process(user_id: int) -> str:
-    # L'appelant doit connaître trois exceptions que le type ne mentionne pas.
-    try:
-        user = get_user(user_id)
-        account = get_account(user)
-        balance = get_balance(account)
-        return f"Solde : {balance}"
-    except UserNotFoundError:
-        return "Utilisateur introuvable"
-    except AccountNotFoundError:
-        return "Compte introuvable"
-    except AccountSuspendedError:
-        return "Compte suspendu"
+    # Rien dans la signature ne prévient l'appelant : trois exceptions peuvent sortir.
+    user = get_user(user_id)
+    account = get_account(user)
+    balance = get_balance(account)
+    return f"Solde : {balance}"
 
 
 if __name__ == "__main__":
-    for uid in (1, 2, 3, 999):
-        print(uid, "->", process(uid))
+    print(1, "->", process(1))
+    # UserNotFoundError : le script s'arrête ici, avec sa stack.
+    # Autres sorties possibles : 2 -> AccountSuspendedError, 3 -> AccountNotFoundError.
+    print(999, "->", process(999))

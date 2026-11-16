@@ -22,7 +22,7 @@ Le code vit dans `1_live/`, organisé en trois couches : `ports/` (le contrat), 
 | 1,5–3,5 | Dessiner la couture : `Protocol` comme interface | `ports/payment_gateway.py`, `ports/dtos.py` | On conçoit l'interface avant l'implémentation |
 | 3,5–5 | Le faux : une implémentation complète sans bibliothèque de mock | `adapters/fake_payment_gateway.py`, `adapters/fake_stripe_api.py` | Un fake est plus fidèle qu'un mock |
 | 5–6 | Tests contre le faux : cas heureux et malheureux | `test_solution_external_dependencies.py` (classe `TestFakePaymentGateway`) | Tous les comportements du contrat sont testés |
-| 6–7 | L'adaptateur Stripe réel | `adapters/stripe_payment_gateway.py`, `adapters/stripe_response.py` | Timeout, parsing défensif, aucune exception ne fuit |
+| 6–7 | L'adaptateur Stripe réel | `adapters/stripe_payment_gateway.py`, `ports/dtos.py` (`StripeResponse`) | Timeout, parsing défensif, aucune exception ne fuit |
 | 7–8 | Même suite de tests, deux implémentations | `test_solution_external_dependencies.py` | Le faux et le réel respectent le même contrat |
 | 8–9 | Timeout, retry, idempotence : où ils vivent | `module_04_external_dependencies.md` (partie 9) | Ces politiques appartiennent à l'adaptateur |
 | 9–10 | Fournisseur défaillant : injection de pannes | `adapters/malfunctioning_stripe_api.py`, `test_stripe_adapter_fault_injection.py` | Quatre principes, aucun `monkeypatch` |
@@ -47,6 +47,17 @@ Depuis la racine du dépôt :
 pytest LiveCoding/module_04_ext_dep/1_live                              # tout est vert (23 tests)
 pytest LiveCoding/module_04_ext_dep                                     # 29 verts, 2 échecs volontaires, voir ci-dessous
 ```
+
+## Typage
+
+Le module est en `pyright` strict, 0 erreur (tests inclus) :
+
+```bash
+cd LiveCoding/module_04_ext_dep/typage
+poetry run pyright -p pyright.module04.json
+```
+
+Le `Result` maison déclare `Ok` et `Err` covariants, ce qui permet à un `Err[PaymentServiceError]` de se ranger dans `ChargeOutcome`. Les parseurs de réponse retournent directement `ChargeResult` et `RefundResult` au lieu d'un `dict[str, str | int]`.
 
 ## Échecs volontaires
 

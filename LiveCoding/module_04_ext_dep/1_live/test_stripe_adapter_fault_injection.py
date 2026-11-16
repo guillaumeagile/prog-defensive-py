@@ -26,6 +26,8 @@ The four principles being enforced:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
+from typing import Any
 
 from .adapters.malfunctioning_stripe_api import MalfunctioningStripeApi
 from .adapters.stripe_payment_gateway import StripePaymentGateway
@@ -37,7 +39,7 @@ from .ports.dtos import ChargeRequest, PaymentServiceError, RefundRequest
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _run(coro):
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 

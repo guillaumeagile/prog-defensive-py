@@ -100,6 +100,22 @@ L'approche E brille dans les modèles riches en domaine, où l'identité des cha
 
 ---
 
+## Les tests unitaires ne suffisent pas : le PBT à la rescousse
+
+Les tests par exemple vérifient les cas que l'on a pensé à écrire : `""`, `"x" * 101`. Le test de propriété `test_property_success_name_is_always_trusted` pose une règle générale : tout nom accepté est non vide et sans espaces en bordure. `hypothesis` fabrique lui-même des centaines de noms, dont des cas auxquels personne ne pense.
+
+Il a détecté un défaut dans `parse_name`. La fonction refusait `""` avant le `strip()`, puis acceptait le résultat sans le revérifier. Le nom `"\r"` passait : après `strip()` il devenait `""`, et un `Name` vide entrait dans le domaine. `NameBlank` existait dans l'ADT d'erreurs mais aucun chemin ne le produisait. Les tests unitaires étaient verts ; `hypothesis` a trouvé l'exemple minimal :
+
+```text
+Falsifying example: test_property_success_name_is_always_trusted(name='\r')
+```
+
+Correction : tester `stripped == ""` après le `strip()` et retourner `NameBlank`. Le cas est maintenant aussi couvert par des tests par exemple (`test_blank_name_returns_name_blank`). Le PBT trouve le défaut, le test par exemple le fige.
+
+**Version de `hypothesis`.** `hypothesis` génère ses exemples de façon aléatoire et guidée, et ses heuristiques changent d'une version à l'autre. Avec la 6.152.9 (verrouillée par `poetry.lock`) le défaut apparaît à chaque exécution. Avec la 6.170.15, le même test est passé vert lors d'une vérification : une montée de version peut donc révéler un défaut, et une version donnée peut aussi le manquer. Un test de propriété vert ne prouve pas l'absence de défaut. Pour garder un cas trouvé, il faut l'écrire en test par exemple, ou avec `@example(name="\r")`. La base `.hypothesis/` rejoue les échecs connus sur une machine donnée, sans servir de garantie.
+
+---
+
 ## Règle pratique
 
 > Parsez l'entrée brute à la boundary, une seule fois.

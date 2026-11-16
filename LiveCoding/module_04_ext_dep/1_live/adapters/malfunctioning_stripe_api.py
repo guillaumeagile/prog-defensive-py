@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from ..ports.dtos import ChargeRequest, RefundRequest
-from .stripe_response import StripeResponse
+from ..ports.dtos import ChargeRequest, RefundRequest, StripeResponse
 from .transport_error import TransportError
 
 
