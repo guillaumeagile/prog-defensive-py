@@ -1,7 +1,7 @@
 from hypothesis import given, strategies as st
 from returns.result import Failure, Success
 
-from user_input import parse_user
+from ecriture_2_parse_user_result import parse_user
 
 
 class TestParseUserInputName:

@@ -4,7 +4,7 @@
 
 - **Étape :** hors live, approfondissement après les approches A, B et C
 - **Approche couverte :** approche D
-- **S'appuie sur :** `../../1_live/user_input.py`
+- **S'appuie sur :** `../../1_live/ecriture_2_parse_user_result.py`
 - **Objectif :** remplacer `Result[UserInput, str]` par `Result[ParsedUserInput, ParseUserError]`
 - **Prolonge :** le Module 02 du guide (`Result[ActiveUser, UserNotFound | UserInactive]`)
 

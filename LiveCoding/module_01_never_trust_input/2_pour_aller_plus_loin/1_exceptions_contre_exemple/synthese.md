@@ -6,7 +6,7 @@ Le même parser de boundary, écrit deux fois. Voici pourquoi la seconde version
 
 ## Place dans le Module 01
 
-- **Étapes live concernées :** `../../1_live/etape_2_pydantic_exception.py` (approche A) et `../../1_live/user_input.py` (approche B)
+- **Étapes live concernées :** `../../1_live/ecriture_1_pydantic_exception.py` (approche A) et `../../1_live/ecriture_2_parse_user_result.py` (approche B)
 - **Ce dossier :** la cascade d'exceptions dans un flux d'inscription (`DEMO_registration_with_exceptions.py`) et ses tests de fragilité
 - **Concepts renforcés :** parse, don't validate ; contrats d'échec explicites
 - **Chaînes complètes côte à côte :** `../5_chaines_registration/`
@@ -14,7 +14,7 @@ Le même parser de boundary, écrit deux fois. Voici pourquoi la seconde version
 
 ---
 
-## Approche A — Exceptions (`1_live/etape_2_pydantic_exception.py`)
+## Approche A — Exceptions (`1_live/ecriture_1_pydantic_exception.py`)
 
 ```python
 user = UserInput(name="", age=30, email="alice@example.com")
@@ -28,7 +28,7 @@ Il doit entourer chaque appel d'un `try/except ValidationError`, faute de quoi i
 
 ---
 
-## Approche B — Result (`1_live/user_input.py`)
+## Approche B — Result (`1_live/ecriture_2_parse_user_result.py`)
 
 ```python
 result = parse_user(name="", age=30, email="alice@example.com")

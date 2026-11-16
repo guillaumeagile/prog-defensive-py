@@ -76,8 +76,8 @@ parse_user_input("", 30, "alice@example.com")
 
 | | A (exceptions) | B (Result + str) | C (dataclass + Result) | D (Result + ADT) | E (Value Objects + flow) |
 |---|---|---|---|---|---|
-| Où la voir | `1_live/etape_2_pydantic_exception.py` | `1_live/user_input.py` | `2_dataclass_sans_pydantic/` | `3_erreurs_typees/` | `4_composition_flow_bind/` |
-| Fichier clé | `etape_2_pydantic_exception.py` | `user_input.py` | `solution_dataclass.py` | `solution_stronger_types.py` | `solution_more_fp_style.py` |
+| Où la voir | `1_live/ecriture_1_pydantic_exception.py` | `1_live/ecriture_2_parse_user_result.py` | `2_dataclass_sans_pydantic/` | `3_erreurs_typees/` | `4_composition_flow_bind/` |
+| Fichier clé | `ecriture_1_pydantic_exception.py` | `ecriture_2_parse_user_result.py` | `solution_dataclass.py` | `solution_stronger_types.py` | `solution_more_fp_style.py` |
 | Chemin d'erreur dans la signature | Non | Oui | Oui | Oui | Oui |
 | Type d'erreur | implicite | `str` | `str` | ADT typé | ADT typé |
 | Types du domaine | chaînes brutes | chaînes brutes | chaînes brutes | chaînes brutes | Value Objects |

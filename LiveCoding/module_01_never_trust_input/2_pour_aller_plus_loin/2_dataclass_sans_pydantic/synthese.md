@@ -4,7 +4,7 @@
 
 - **Étape :** hors live, chemin de repli quand Pydantic n'est pas disponible
 - **Approche couverte :** approche C
-- **Se compare à :** l'approche B (`../../1_live/user_input.py`, recommandée), sans dépendance à Pydantic
+- **Se compare à :** l'approche B (`../../1_live/ecriture_2_parse_user_result.py`, recommandée), sans dépendance à Pydantic
 - **Concepts renforcés :** Value Objects, contrat parse-don't-validate, échecs explicites via `Result`
 - **Extension possible :** `../3_erreurs_typees/` (approche D) pour des ADT d'erreurs typées
 

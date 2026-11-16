@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+l;efrom dataclasses import dataclass
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from returns.result import Failure, Result, Success

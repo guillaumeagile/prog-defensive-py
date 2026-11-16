@@ -14,13 +14,13 @@ Source de pilotage : [`../../defensive_programming_live_coding_guide.md`](../../
 
 | Min | Étape | Fichier | Message |
 |---|---|---|---|
-| 0–1 | ❌ Le code fait confiance à l'appelant | `1_live/etape_1_confiance_aveugle.py` | La donnée invalide entre sans résistance |
-| 1–3 | ✅ Pythonic : Pydantic lève `ValidationError` | `1_live/etape_2_pydantic_exception.py` | La signature ne dit pas que l'appel peut échouer |
-| 3–6 | ✅ FP : `parse_user -> Result[UserInput, str]` | `1_live/user_input.py` | Le type de retour dit toute la vérité |
-| 6–7 | Tests : exemples + propriété `hypothesis` | `1_live/test_user_input.py` | Les tests fixent le contrat |
+| 0–1 | ❌ Le code fait confiance à l'appelant | `1_live/0_probleme_confiance_aveugle.py` | La donnée invalide entre sans résistance |
+| 1–3 | ✅ Pythonic : Pydantic lève `ValidationError` | `1_live/ecriture_1_pydantic_exception.py` | La signature ne dit pas que l'appel peut échouer |
+| 3–6 | ✅ FP : `parse_user -> Result[UserInput, str]` | `1_live/ecriture_2_parse_user_result.py` | Le type de retour dit toute la vérité |
+| 6–7 | Tests : exemples + propriété `hypothesis` | `1_live/test_ecriture_2_parse_user_result.py` | Les tests fixent le contrat |
 | 7–8 | Exercice : `ProductInput` | `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Appliquer la même boundary |
 
-`1_live/testbook_user_input.ipynb` permet d'explorer `parse_user` et de lancer les tests depuis un notebook.
+`1_live/testbook_ecriture_2_parse_user_result.ipynb` permet d'explorer `parse_user` et de lancer les tests depuis un notebook.
 
 ## Pour aller plus loin (hors live)
 

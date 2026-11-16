@@ -28,9 +28,9 @@ Le dossier se découpe par **activité** :
 
 | Dossier / document | Étape live | Contenu |
 |---|---|---|
-| `1_live/etape_1_confiance_aveugle.py` | Étape 1 | ❌ Le code fait confiance à l'appelant |
-| `1_live/etape_2_pydantic_exception.py` | Étape 2 | ✅ Pythonic : Pydantic lève `ValidationError` (chemin d'erreur implicite) |
-| `1_live/user_input.py` + `test_user_input.py` | Étapes 3 et 4 | ✅ FP : `parse_user -> Result[UserInput, str]`, puis les tests |
+| `1_live/0_probleme_confiance_aveugle.py` | Étape 1 | ❌ Le code fait confiance à l'appelant |
+| `1_live/ecriture_1_pydantic_exception.py` | Étape 2 | ✅ Pythonic : Pydantic lève `ValidationError` (chemin d'erreur implicite) |
+| `1_live/ecriture_2_parse_user_result.py` + `test_ecriture_2_parse_user_result.py` | Étapes 3 et 4 | ✅ FP : `parse_user -> Result[UserInput, str]`, puis les tests |
 | `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Exercice | Même contrat appliqué à un payload plus riche |
 | `2_pour_aller_plus_loin/1_exceptions_contre_exemple/` | Hors live | Cascade d'exceptions dans un flux d'inscription |
 | `2_pour_aller_plus_loin/2_dataclass_sans_pydantic/` | Hors live | Alternative stdlib (`dataclass` + `__post_init__`) |
@@ -128,7 +128,7 @@ db.fetchone()            # base externe (vous ne maîtrisez pas le schéma)
 
 ### Étape 1 : ❌ Faire confiance à l'appelant (45 s)
 
-Ouvrez `1_live/etape_1_confiance_aveugle.py` et lancez-le :
+Ouvrez `1_live/0_probleme_confiance_aveugle.py` et lancez-le :
 
 ```python
 def create_user(data: dict) -> None:
@@ -149,7 +149,7 @@ create_user({"name": "Bob"})           # KeyError technique
 
 ### Étape 2 : ✅ Pythonic, Pydantic lève une exception (75 s)
 
-Ouvrez `1_live/etape_2_pydantic_exception.py` et montrez l'appel du constructeur :
+Ouvrez `1_live/ecriture_1_pydantic_exception.py` et montrez l'appel du constructeur :
 
 ```python
 user = UserInput(name="", age=30, email="alice@example.com")
@@ -166,7 +166,7 @@ user = UserInput(name="", age=30, email="alice@example.com")
 
 ### Étape 3 : ✅ FP, `Result` explicite (90 s)
 
-Ouvrez `1_live/user_input.py` et montrez la fonction de boundary :
+Ouvrez `1_live/ecriture_2_parse_user_result.py` et montrez la fonction de boundary :
 
 ```python
 def parse_user(name: str, age: int, email: str) -> Result[UserInput, str]:
@@ -191,7 +191,7 @@ def parse_user(name: str, age: int, email: str) -> Result[UserInput, str]:
 
 ### Étape 4 : tests (30 s)
 
-Ouvrez `1_live/test_user_input.py` et lancez `pytest LiveCoding/module_01_never_trust_input/1_live`.
+Ouvrez `1_live/test_ecriture_2_parse_user_result.py` et lancez `pytest LiveCoding/module_01_never_trust_input/1_live`.
 
 **Points à faire passer :**
 

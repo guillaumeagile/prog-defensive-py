@@ -2,7 +2,7 @@
 
 Reprend le « ❌ Bad » du guide (Module 01). À lancer tel quel :
 
-    python etape_1_confiance_aveugle.py
+    python 0_probleme_confiance_aveugle.py
 
 Rien ne valide l'entrée : la donnée invalide entre dans le système
 et le problème apparaît plus loin, ou jamais.
@@ -36,7 +36,5 @@ if __name__ == "__main__":
     print("Ligne enregistrée :", db.rows[-1])
 
     # Entrée incomplète : l'erreur est un KeyError technique, sans message métier.
-    try:
-        create_user({"name": "Bob"})
-    except KeyError as error:
-        print("Clé manquante :", error)
+
+    create_user({"name": "Bob"})
