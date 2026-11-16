@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from typing import cast
+from collections.abc import Awaitable, Callable, Mapping
 
 from ..core.result import Err, Ok, Result
 from ..ports.dtos import (
@@ -12,9 +11,10 @@ from ..ports.dtos import (
     PaymentServiceError,
     RefundRequest,
     RefundResult,
+    JsonValue,
+    StripeResponse,
 )
 from ..ports.payment_gateway import ChargeOutcome, RefundOutcome, StripeApi
-from .stripe_response import StripeResponse
 from .transport_error import TransportError
 
 
@@ -111,13 +111,13 @@ def _validate_charge_request(request: ChargeRequest) -> ChargeOutcome | None:
 def _decline_from_response(response: StripeResponse) -> ChargeOutcome:
     error = response.body.get("error")
     if isinstance(error, dict):
-        decline_code = cast("dict[str, object]", error).get("decline_code")
+        decline_code = error.get("decline_code")
         if isinstance(decline_code, str):
             return Err(PaymentDeclined(decline_code))
     return Err(PaymentServiceError("Stripe returned an invalid decline payload"))
 
 
-def _parse_charge_response(body: dict[str, object]) -> Result[ChargeResult, PaymentServiceError]:
+def _parse_charge_response(body: Mapping[str, JsonValue]) -> Result[ChargeResult, PaymentServiceError]:
     charge_id = body.get("id")
     amount = body.get("amount")
     currency = body.get("currency")
@@ -135,7 +135,7 @@ def _parse_charge_response(body: dict[str, object]) -> Result[ChargeResult, Paym
     return Ok(ChargeResult(charge_id=charge_id, amount_cents=amount, currency=currency, status=status))
 
 
-def _parse_refund_response(body: dict[str, object]) -> Result[RefundResult, PaymentServiceError]:
+def _parse_refund_response(body: Mapping[str, JsonValue]) -> Result[RefundResult, PaymentServiceError]:
     refund_id = body.get("id")
     charge_id = body.get("charge")
     amount = body.get("amount")

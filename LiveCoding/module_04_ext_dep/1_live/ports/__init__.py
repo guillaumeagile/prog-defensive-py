@@ -6,6 +6,8 @@ from .dtos import (
     RefundResult,
     PaymentDeclined,
     PaymentServiceError,
+    StripeResponse,
+    JsonValue,
 )
 
 __all__ = [
@@ -19,4 +21,6 @@ __all__ = [
     "RefundResult",
     "PaymentDeclined",
     "PaymentServiceError",
+    "StripeResponse",
+    "JsonValue",
 ]

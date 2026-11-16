@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from ..core.result import Err, Ok
 from .dtos import (
@@ -10,10 +10,8 @@ from .dtos import (
     PaymentServiceError,
     RefundRequest,
     RefundResult,
+    StripeResponse,
 )
-
-if TYPE_CHECKING:
-    from ..adapters.stripe_response import StripeResponse
 
 ChargeOutcome = Ok[ChargeResult] | Err[PaymentDeclined | PaymentServiceError]
 RefundOutcome = Ok[RefundResult] | Err[PaymentServiceError]
