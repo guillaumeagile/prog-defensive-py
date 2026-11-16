@@ -1,146 +1,175 @@
 # Module 01 — Never Trust Input
-## Detailed Lesson Plan · ~8 minutes live · Defensive Programming from the Trenches
+## Plan de leçon détaillé · ~8 minutes en live · Defensive Programming from the Trenches
 
 ---
 
-## Overview
+## Vue d'ensemble
 
 | | |
 |---|---|
-| **Duration** | 8 minutes (live) + 5 min exercise if async |
-| **Core principle** | Parse at the boundary. Surface failures explicitly. |
-| **Python focus** | `pydantic` v2, `returns.Result`, `dataclasses`, type hints, `__post_init__` |
-| **Audience takeaway** | I know where to parse input and how to expose expected failures honestly |
+| **Durée** | 8 minutes (live) + 5 min d'exercice en asynchrone |
+| **Principe central** | Parse at the boundary. Exposer les échecs explicitement. |
+| **Focus Python** | `pydantic` v2, `returns.Result`, `dataclasses`, type hints, `__post_init__` |
+| **Ce que retient l'audience** | Je sais où parser l'entrée et comment exposer honnêtement les échecs attendus |
 
 ---
 
-## How to navigate this folder
+## Comment naviguer dans ce dossier
 
-This module is split by **activity**:
+Le dossier se découpe par **activité** :
 
-- `LiveCoding/module_01_never_trust_input/` = what you demo live
-- `exercises/module_01_never_trust_input/` = what participants do after the demo
+- `LiveCoding/module_01_never_trust_input/1_live/` : ce que vous tapez en direct
+- `LiveCoding/module_01_never_trust_input/2_pour_aller_plus_loin/` : variantes hors live, pour les participants
+- `exercises/module_01_never_trust_input/` : l'exercice des participants après la démo
+- `presentation.md` : les slides (format Marp), en français
+- `README.md` : le point d'entrée avec le déroulé minute par minute et les échecs volontaires
 
-### Mapping: live steps and source folders
+### Correspondance : étapes live et dossiers
 
-| Folder / doc | Live step | What it covers | Approach labels |
-|---|---|---|---|
-| `1.quick_first_view/exceptions/` | Step 1 | Exception-based boundary parsing (implicit error path) | Approach A |
-| `1.quick_first_view/results/` | Step 2 | Same validation rules with an explicit `Result` contract | Approach B |
-| `1.quick_first_view/exceptions/processing_chain_with_exceptions.py` + `1.quick_first_view/results/processing_chain_with_results.py` | Step 3 | Larger side-by-side propagation chain comparison | Approach A + B |
-| `2.dataclass_post_init/` | Step 4 | Stdlib-only alternative (`dataclass` + `__post_init__`) | Approach C |
-| `3.result_stronger_types/` | Optional Step 5 | FP-style extension with typed error ADT (`Result[T, ErrorADT]`) | Approach D |
-| `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Exercise | Apply the same boundary contract to a richer payload | Approach B |
+| Dossier / document | Étape live | Contenu |
+|---|---|---|
+| `1_live/0_probleme_confiance_aveugle.py` | Étape 1 | ❌ Le code fait confiance à l'appelant |
+| `1_live/ecriture_1_pydantic_exception.py` | Étape 2 | ✅ Pythonic : Pydantic lève `ValidationError` (chemin d'erreur implicite) |
+| `1_live/ecriture_2_parse_user_result.py` + `test_ecriture_2_parse_user_result.py` | Étapes 3 et 4 | ✅ FP : `parse_user -> Result[UserInput, str]`, puis les tests |
+| `../../exercises/module_01_never_trust_input/3.exercise_product_input/` | Exercice | Même contrat appliqué à un payload plus riche |
+| `2_pour_aller_plus_loin/1_exceptions_contre_exemple/` | Hors live | Cascade d'exceptions dans un flux d'inscription |
+| `2_pour_aller_plus_loin/2_dataclass_sans_pydantic/` | Hors live | Alternative stdlib (`dataclass` + `__post_init__`) |
+| `2_pour_aller_plus_loin/3_erreurs_typees/` | Hors live | `Result[T, ErrorADT]` avec des erreurs typées |
+| `2_pour_aller_plus_loin/4_composition_flow_bind/` | Hors live | Un parser par champ, composés avec `flow` et `bind` |
+| `2_pour_aller_plus_loin/5_chaines_registration/` | Hors live | Chaînes d'inscription avec exceptions et avec `Result`, côte à côte |
 
----
-
-## Learning Objectives
-
-By the end of this module, participants will be able to:
-
-1. Identify where the **trust boundary** is in any system they work on
-2. Apply **pydantic v2** to parse and coerce raw boundary input
-3. Return expected failures as **`Result[Value, Error]`** instead of leaking exceptions
-4. Distinguish **whitelist** from **blacklist** strategies — and know which to use
-5. Name at least 3 real-world "falsehood" categories that bite developers
+Les noms de fonctions suivent le guide : `UserInput`, `parse_user`, `create_user`.
 
 ---
 
-## Facilitator Timing
+## Objectifs d'apprentissage
+
+À la fin du module, les participants savent :
+
+1. Identifier la **trust boundary** dans n'importe quel système
+2. Appliquer **pydantic v2** pour parser et coercer l'entrée brute à la boundary
+3. Retourner les échecs attendus en **`Result[Value, Error]`** au lieu de laisser fuir des exceptions
+4. Distinguer les stratégies **whitelist** et **blacklist**, et savoir laquelle choisir
+5. Nommer au moins 3 catégories de « falsehoods » qui piègent les développeurs
+
+---
+
+## Timing de l'instructeur
 
 ```
-00:00 — 00:90   Hook: war story or question (90 sec)
-01:30 — 03:00   Concept: what is the boundary? (90 sec)
-03:00 — 06:30   Live code: Approaches A/B/C + chain comparison (3.5 min)
-06:30 — 07:30   Whitelist vs blacklist principle (60 sec)
-07:30 — 08:00   Falsehoods + exercise brief (30 sec)
+00:00 — 01:30   Accroche : war story ou question (90 s)
+01:30 — 03:00   Concept : qu'est-ce que la boundary ? (90 s)
+03:00 — 07:00   Live code : étapes 1 à 4 (4 min)
+07:00 — 07:30   Whitelist vs blacklist (30 s)
+07:30 — 08:00   Falsehoods + consigne d'exercice (30 s)
 ```
 
 ---
 
-## Hook (90 sec)
+## Accroche (90 s)
 
-**Open with this question to the room:**
+**Ouvrez avec cette question à la salle :**
 
-> "Has anyone here spent more than 30 minutes debugging a bug that turned out to be unexpected input — a None, an empty string, a negative number — that came in three layers back and corrupted something quietly?"
+> « Qui ici a passé plus de 30 minutes à déboguer un bug venu d'une entrée inattendue — un `None`, une chaîne vide, un nombre négatif — arrivé trois couches plus haut et qui a corrompu quelque chose en silence ? »
 
-*(Pause. Let hands go up. That's your audience.)*
+*(Pause. Laissez les mains se lever. Voilà votre audience.)*
 
-**Then deliver your war story.** Use the slot below — your own incident is worth 10x a hypothetical.
+**Puis racontez votre war story.** Votre propre incident vaut dix fois une histoire hypothétique.
 
-### ⚔ War story slot
+### ⚔ Emplacement de la war story
 
-> *Fill in before the session. Suggested angle: a None or malformed value that entered the system unvalidated, passed through 2–3 layers of logic, and either:*
-> - *corrupted a database record silently*
-> - *caused a wrong calculation that only surfaced in production*
-> - *triggered a crash far from the actual source*
+> *À remplir avant la session. Angle suggéré : un `None` ou une valeur malformée entrée dans le système sans validation, passée à travers 2 ou 3 couches de logique, puis :*
+> - *a corrompu un enregistrement en base en silence*
+> - *a causé un calcul faux qui n'est apparu qu'en production*
+> - *a déclenché un crash loin de la source réelle*
 >
-> *Structure: what entered → where it should have been caught → where it actually failed → how long it took to trace back.*
+> *Structure : ce qui est entré → où on aurait dû l'attraper → où ça a réellement cassé → combien de temps pour remonter à la cause.*
 
-**Punchline to land after the story:**
+**Phrase à placer après l'histoire :**
 
-> "The problem wasn't the bug itself. It was that we trusted the caller. And in production, no caller can be trusted — not a user, not a frontend, not another service you wrote yourself."
+> « Le bug en lui-même importait peu. Nous avions fait confiance à l'appelant. En production, aucun appelant ne mérite cette confiance : ni un utilisateur, ni un frontend, ni un autre service que vous avez écrit vous-même. »
 
 ---
 
-## Concept — The Trust Boundary (90 sec)
+## Concept — La trust boundary (90 s)
 
-**Draw this on a whiteboard or say it verbally:**
+**Dessinez ceci au tableau ou dites-le à voix haute :**
 
 ```
-[ Outside world ]  ──►  [ BOUNDARY ]  ──►  [ Your domain logic ]
-  users, APIs,           ← validate           clean, typed,
-  queues, files,           here, once          trusted objects
+[ Monde extérieur ]  ──►  [ BOUNDARY ]  ──►  [ Votre domaine ]
+  users, APIs,            ← parser ici        objets propres, typés,
+  queues, fichiers,         une seule fois      de confiance
   env vars, CLI
 ```
 
-**Key points to make:**
+**Points à faire passer :**
 
-- The boundary is anywhere data **enters** your system: HTTP endpoints, CLI args, message queue consumers, file readers, environment variables, database reads from external sources
-- "Validate booleans later" is fragile; **parse now** into trusted typed objects
-- After the boundary, your code should be able to trust its inputs completely — that's the **contract** the boundary enforces
+- La boundary se trouve partout où des données **entrent** dans le système : endpoints HTTP, arguments CLI, consumers de message queue, lecteurs de fichiers, variables d'environnement, lectures de bases externes
+- « Valider plus tard » est fragile ; **parser maintenant** en objets typés de confiance
+- Après la boundary, le code peut faire entièrement confiance à ses entrées : c'est le **contrat** que la boundary garantit
 
-**What counts as "the boundary":**
+**Ce qui compte comme boundary :**
 
 ```python
-# These are ALL boundaries — validate at every one
-request.json()           # HTTP endpoint
-os.environ["DB_URL"]     # environment variable
-open("config.json")      # file read
+# Toutes ces lignes sont des boundaries — validez à chacune
+request.json()           # endpoint HTTP
+os.environ["DB_URL"]     # variable d'environnement
+open("config.json")      # lecture de fichier
 queue.receive_message()  # message queue
-sys.argv[1]              # CLI argument
-db.fetchone()            # external DB (you don't control the schema)
+sys.argv[1]              # argument CLI
+db.fetchone()            # base externe (vous ne maîtrisez pas le schéma)
 ```
 
 ---
 
-## Live Code Walkthrough (3.5 min)
+## Live Code (4 min)
 
-> **Facilitator note**: This sequence mirrors exactly what is currently in `LiveCoding/module_01_never_trust_input/`.
+> **Note pour l'instructeur** : cette séquence suit le guide (❌ Bad → ✅ Pythonic → ✅ FP) et correspond exactement au contenu de `1_live/`. Tapez le code en direct, ne le collez pas.
 
-### Step 1: Approach A in `1.quick_first_view/exceptions/` (60 sec)
+### Étape 1 : ❌ Faire confiance à l'appelant (45 s)
 
-Open `1.quick_first_view/exceptions/solution_with_exceptions.py` and show the constructor call:
+Ouvrez `1_live/0_probleme_confiance_aveugle.py` et lancez-le :
+
+```python
+def create_user(data: dict) -> None:
+    name = data["name"]
+    age = data["age"]
+    db.insert(name=name, age=age)
+
+create_user({"name": "", "age": -5})   # accepté sans broncher
+create_user({"name": "Bob"})           # KeyError technique
+```
+
+**Points à faire passer :**
+
+- La donnée absurde entre dans la base
+- L'erreur, quand elle vient, ne dit rien du problème métier
+
+---
+
+### Étape 2 : ✅ Pythonic, Pydantic lève une exception (75 s)
+
+Ouvrez `1_live/ecriture_1_pydantic_exception.py` et montrez l'appel du constructeur :
 
 ```python
 user = UserInput(name="", age=30, email="alice@example.com")
-# raises ValidationError
+# lève ValidationError
 ```
 
-**Points to land:**
+**Points à faire passer :**
 
-- Validation rules are declarative and solid (Pydantic model)
-- Failure is still implicit: nothing in the signature tells callers this can fail
-- Every caller must remember `try/except ValidationError`
+- Les règles de validation sont déclaratives et solides (modèle Pydantic)
+- L'échec reste implicite : rien dans la signature n'indique que l'appel peut échouer
+- Chaque appelant doit se souvenir du `try/except ValidationError`
 
 ---
 
-### Step 2: Approach B in `1.quick_first_view/results/` (75 sec)
+### Étape 3 : ✅ FP, `Result` explicite (90 s)
 
-Open `1.quick_first_view/results/solution_results.py` and show the boundary function:
+Ouvrez `1_live/ecriture_2_parse_user_result.py` et montrez la fonction de boundary :
 
 ```python
-def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
+def parse_user(name: str, age: int, email: str) -> Result[UserInput, str]:
     try:
         validated = _UserSchema(name=name, age=age, email=email)
         return Success(UserInput(name=validated.name, age=validated.age, email=validated.email))
@@ -151,33 +180,35 @@ def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
         return Failure(f"{field}: {msg}")
 ```
 
-**Points to land:**
+**Points à faire passer :**
 
-- Pydantic still performs all field validation and coercion
-- Exceptions are contained at one boundary point
-- The private `_UserSchema` stays at the boundary; callers receive a domain `UserInput`
-- Callers handle `Success`/`Failure` explicitly — no hidden crash path
-
----
-
-### Step 3: Larger side-by-side chains in `1.quick_first_view/` (60 sec)
-
-Open these paired demos:
-
-- `exceptions/processing_chain_with_exceptions.py`
-- `results/processing_chain_with_results.py`
-
-They implement the same registration workflow, but:
-
-- Approach A uses layered `try/except` and exception translation
-- Approach B composes with `flow(..., bind(...))`
-- Both reach the same endpoint-style adapters (`create_user_http_endpoint`, `handle_signup_message`), but only Approach B keeps expected failures explicit in return types
+- Pydantic fait toujours toute la validation et la coercion des champs
+- Les exceptions restent confinées en un seul point de la boundary
+- Le `_UserSchema` privé reste à la boundary, les appelants reçoivent un `UserInput` du domaine
+- Les appelants traitent `Success` / `Failure` explicitement, sans chemin de crash caché
 
 ---
 
-### Step 4: Approach C in `2.dataclass_post_init/` (45 sec)
+### Étape 4 : tests (30 s)
 
-Open `2.dataclass_post_init/solution_dataclass.py`:
+Ouvrez `1_live/test_ecriture_2_parse_user_result.py` et lancez `pytest LiveCoding/module_01_never_trust_input/1_live`.
+
+**Points à faire passer :**
+
+- Les tests par exemple fixent les cas connus
+- Le test de propriété `hypothesis` rejette tous les noms faits d'espaces blancs
+
+---
+
+## Pour aller plus loin (hors live)
+
+Ces variantes se parcourent à l'oral en 1 à 2 minutes chacune, ou se laissent aux participants. Chaque dossier contient une `synthese.md`.
+
+### Exceptions en cascade (`1_exceptions_contre_exemple/`)
+
+`DEMO_registration_with_exceptions.py` montre un flux d'inscription où chaque couche doit connaître les exceptions de la couche inférieure. Chaque nouvelle exception impose une clause `except` de plus à chaque niveau. Les tests de fragilité (`test_DEMO_registration_fragility.py`) illustrent la fuite d'exceptions non anticipées.
+
+### dataclass + `__post_init__` (`2_dataclass_sans_pydantic/`)
 
 ```python
 @dataclass(frozen=True)
@@ -192,59 +223,26 @@ class UserInput:
             raise ValueError("name cannot be blank")
 ```
 
-And the parser:
+- Même contrat `Result` explicite que l'étape 3
+- Aucune dépendance à Pydantic, la validation est manuelle
+- `UserInput` reste un Value Object immuable (`@dataclass(frozen=True)`)
 
-```python
-def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
-    try:
-        return Success(UserInput(name=name, age=age, email=email))
-    except ValueError as e:
-        return Failure(str(e))
-```
-
-**Points to land:**
-
-- Same explicit `Result` contract as Approach B
-- No Pydantic dependency; validation is manual
-- `UserInput` remains an immutable value object (`@dataclass(frozen=True)`)
-- Useful fallback for stdlib-only contexts
-
----
-
-### Optional Step 5: Approach D in `3.result_stronger_types/` (60 sec)
-
-Open `3.result_stronger_types/solution_stronger_types.py`:
+### Erreurs typées (`3_erreurs_typees/`)
 
 ```python
 ParseUserError = PayloadError | NameEmpty | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
 
 def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
-    parsed_raw_result = parse_raw_user_input(raw_payload)
-    if isinstance(parsed_raw_result, Failure):
-        return Failure(parsed_raw_result.failure())
-
-    raw = parsed_raw_result.unwrap()
-    return parse_user_input(raw.name, raw.age, raw.email)
+    ...
 ```
 
-**Points to land:**
+- Même comportement fail-fast que l'étape 3, avec des échecs typés au lieu de `str`
+- L'appelant peut faire du pattern matching sur les variantes d'erreur
+- Utile quand le comportement de l'UI ou de l'API dépend du type d'échec
 
-- Same fail-fast behavior as Approach B, but failures are typed (not `str`)
-- Caller can pattern-match on failure variants safely
-- Stronger contracts help when UI/API behavior depends on specific failure kinds
-- Optional static checks (strict, via Poetry): `poetry run pyright --project 3.result_stronger_types/pyright.module01.json` and `poetry run mypy --config-file 3.result_stronger_types/mypy.module01.ini`
-
----
-
-### Optional Step 6: More FP composition in `4.more_FP_style/` (45 sec)
-
-Open `4.more_FP_style/solution_more_fp_style.py` to show a `flow(..., bind(...))`
-version of the same parsing pipeline.
-
+### Composition `flow` + `bind` (`4_composition_flow_bind/`)
 
 ```python
-ParseUserError = PayloadError | NameEmpty | NameBlank | NameTooLong | AgeOutOfRange | EmailMissingAt
-
 def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, ParseUserError]:
     return flow(
         parse_raw_user_input(raw_payload),
@@ -252,83 +250,71 @@ def parse_user_payload(raw_payload: dict[str, Any]) -> Result[ParsedUserInput, P
     )
 ```
 
+Ce dossier utilise sa propre config Pyright (`pyright.more_fp_style.json`) qui assouplit `reportUnknownArgumentType` et `reportUnknownMemberType` pour ce fichier très FP / HKT.
 
-Use local Pyright config for this folder:
-
-- `poetry run pyright --project 4.more_FP_style/pyright.more_fp_style.json`
-
-Notes:
-
-- Keeps strict checking overall
-- Relaxes only `reportUnknownArgumentType` and `reportUnknownMemberType` for this FP/HKT-heavy file
-- Runtime behavior remains the same as Approach D; this is mostly a composition-style variant
+Les dossiers 3 et 4 recoupent le Module 02 du guide, qui enseigne déjà l'ADT d'erreurs (`UserNotFound | UserInactive`) et le ROP avec `flow` / `bind`.
 
 ---
 
-## Functional Style versus Pyright
+## Style fonctionnel et Pyright
 
-`flow(...)` and `bind(...)` are functional-composition choices (from `returns`), but the friction you may feel is mostly with **Pyright inference**, not with runtime behavior. 
+`flow(...)` et `bind(...)` sont des choix de composition fonctionnelle (de `returns`). La friction éventuelle vient de l'**inférence de Pyright**, pas du comportement à l'exécution.
 
-HKT-like abstractions can trigger "partially unknown" diagnostics even when the pipeline is correct.
-In practice: keep the FP style when it improves readability, and switch to explicit unwrapping (or localized Pyright relaxations) where typing gets noisy. 
-
-
+Les abstractions de type HKT peuvent déclencher des diagnostics « partially unknown » alors que le pipeline est correct. En pratique : gardez le style FP quand il améliore la lisibilité, et passez à un unwrapping explicite (ou à des assouplissements Pyright locaux) quand le typage devient bruyant.
 
 ```mermaid
 flowchart LR
-  subgraph Runtime["Runtime semantics (same behavior)"]
-    A["Untrusted payload"] --> B["Parse at boundary"]
+  subgraph Runtime["Sémantique à l'exécution (même comportement)"]
+    A["Payload non fiable"] --> B["Parse à la boundary"]
     B --> C["Result[ParsedUserInput, ParseUserError]"]
-    C -->|Success| D["Trusted domain data"]
-    C -->|Failure| E["Typed error ADT"]
+    C -->|Success| D["Données de confiance du domaine"]
+    C -->|Failure| E["ADT d'erreurs typées"]
   end
 
-  subgraph Style["Composition style choices"]
-    S1["Explicit unwrapping"]
+  subgraph Style["Choix de style de composition"]
+    S1["Unwrapping explicite"]
     S2["flow(...) + bind(...)"]
   end
 
-  subgraph Typing["Pyright static typing ergonomics"]
-    T1["Explicit unwrapping<br/>usually inferred cleanly"]
-    T2["flow/bind (HKT-like)<br/>can trigger partially unknown diagnostics"]
-    T3["Local relaxations<br/>or pipeline refactor"]
+  subgraph Typing["Ergonomie du typage Pyright"]
+    T1["Unwrapping explicite<br/>inféré proprement"]
+    T2["flow/bind (type HKT)<br/>peut déclencher partially unknown"]
+    T3["Assouplissements locaux<br/>ou refonte du pipeline"]
   end
 
-  S1 -. "implements same parse contract" .-> C
-  S2 -. "implements same parse contract" .-> C
+  S1 -. "implémente le même contrat de parse" .-> C
+  S2 -. "implémente le même contrat de parse" .-> C
   S1 -.-> T1
   S2 -.-> T2 --> T3
 ```
 
-**HKT quick intuition:** `Higher-Kinded Types` let us abstract over a *generic container shape* (like `Result[...]`) instead of only concrete inner types (like `int` or `str`). 
-
-In Python, this is emulated by libraries, so combinators like `bind` may be runtime-correct but still hard for Pyright to infer perfectly.
+**Intuition HKT :** les Higher-Kinded Types permettent d'abstraire une *forme de conteneur générique* (comme `Result[...]`) au lieu de types internes concrets (comme `int` ou `str`). Python les émule via des bibliothèques, donc un combinateur comme `bind` peut être correct à l'exécution tout en restant difficile à inférer parfaitement pour Pyright.
 
 ---
 
-## Whitelist vs Blacklist (60 sec)
+## Whitelist vs Blacklist (30 s)
 
-**The principle:**
+**Le principe :**
 
-> "Define what is **valid**. Reject everything else. Never define what is **invalid** — you'll always miss something."
+> « Définissez ce qui est **valide**. Rejetez tout le reste. Ne définissez jamais ce qui est **invalide** : vous en oublierez toujours. »
 
 ```python
 ALLOWED_ROLES = {"viewer", "editor", "admin"}
 
-# ❌ Blacklist — you will miss something
+# ❌ Blacklist — vous en raterez
 def set_role(role: str):
-    if role == "superadmin":          # what about "ADMIN", "Admin", " admin"?
+    if role == "superadmin":          # et "ADMIN", "Admin", " admin" ?
         raise ValueError("not allowed")
     db.set_role(role)
 
-# ✅ Whitelist — explicit, exhaustive, closed
+# ✅ Whitelist — explicite, exhaustive, fermée
 def set_role(role: str):
     if role not in ALLOWED_ROLES:
         raise ValueError(f"role must be one of {ALLOWED_ROLES}, got: {role!r}")
     db.set_role(role)
 ```
 
-**For structured data, use an Enum:**
+**Pour des données structurées, utilisez un Enum :**
 
 ```python
 from enum import Enum
@@ -338,70 +324,69 @@ class UserRole(str, Enum):
     EDITOR = "editor"
     ADMIN  = "admin"
 
-# pydantic will validate and coerce automatically
+# pydantic valide et coerce automatiquement
 class UserInput(BaseModel):
-    role: UserRole   # "superadmin" → ValidationError. Period.
+    role: UserRole   # "superadmin" → ValidationError. Point final.
 ```
 
-**Say:** "The `str, Enum` pattern means you can use `UserRole.ADMIN` in your code but still accept `"admin"` from JSON. Best of both worlds."
+**À dire :** « Le pattern `str, Enum` permet d'utiliser `UserRole.ADMIN` dans le code tout en acceptant `"admin"` depuis du JSON. »
 
 ---
 
-## Falsehoods (30 sec)
+## Falsehoods (30 s)
 
-> *"The last thing to leave you with: your intuition about 'valid' data is wrong in ways you don't expect."*
+> *« Dernier point : votre intuition sur ce qui est "valide" se trompe de façons que vous n'imaginez pas. »*
 
-**Name these quickly — don't explain, just list:**
+**Citez-les vite, sans expliquer :**
 
-- Names can contain spaces, hyphens, apostrophes, unicode, and be a single character (`"O"` is a valid surname)
-- Phone numbers: country codes, leading zeros, extensions, spaces, dots
-- Dates: timezones, DST, leap seconds, non-Gregorian calendars
-- Addresses: no fixed number of lines, no required postal code, no required city
-- Ages: can be 0, can be 130+, can be unknown
-- "Empty" strings: `""`, `" "`, `"\t"`, `"\n"` — all different
+- Noms : espaces, tirets, apostrophes, unicode, un seul caractère (`"O"` est un nom de famille valide)
+- Numéros de téléphone : indicatifs pays, zéros initiaux, extensions, espaces, points
+- Dates : timezones, DST, leap seconds, calendriers non grégoriens
+- Adresses : nombre de lignes variable, pas de code postal obligatoire, pas de ville obligatoire
+- Âges : peut valoir 0, peut dépasser 130, peut être inconnu
+- Chaînes « vides » : `""`, `" "`, `"\t"`, `"\n"` sont quatre cas distincts
 
-**Punchline:** "If you're hand-rolling validation for any of these, you're probably wrong. Use a library, use an RFC, or at minimum read the Falsehoods post before shipping."
+**Phrase de fin :** « Si vous écrivez à la main la validation de l'un de ces éléments, vous vous trompez probablement. Utilisez une bibliothèque, une RFC, ou lisez au minimum le billet Falsehoods avant de livrer. »
 
-*(Reference: kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)*
+*(Référence : kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)*
 
 ---
 
-## Exercise (solo or pair, 5 min)
+## Exercice (seul ou en binôme, 5 min)
 
-Exercise files are in `../../exercises/module_01_never_trust_input/3.exercise_product_input/`.
-Use this section as facilitator notes only.
+Les fichiers de l'exercice sont dans `../../exercises/module_01_never_trust_input/3.exercise_product_input/`. Cette section sert de notes à l'instructeur.
 
-### Setup
+### Mise en place
 
 ```python
-# Install: pip install pydantic[email]
+# Installer : pip install pydantic[email]
 from pydantic import BaseModel, Field, field_validator, EmailStr
 ```
 
-### Task
+### Consigne
 
-The following raw input comes from an HTTP API. Write a `pydantic` model called `ProductInput` that validates it at the boundary.
+Le payload brut suivant vient d'une API HTTP. Écrivez un modèle `pydantic` nommé `ProductInput` qui le valide à la boundary.
 
 ```python
-# Sample raw payload (from request.json())
+# Payload brut d'exemple (depuis request.json())
 raw = {
     "name":        "Widget Pro",
-    "price":       "29.99",          # comes in as a string
-    "stock":       -3,               # should never be negative
-    "category":    "ELECTRONICS",    # should be lowercased and from a fixed set
-    "description": "  ",             # whitespace-only — should be treated as absent
+    "price":       "29.99",          # arrive en string
+    "stock":       -3,               # ne doit jamais être négatif
+    "category":    "ELECTRONICS",    # à passer en minuscules, dans un ensemble fixe
+    "description": "  ",             # blanc — à traiter comme absent
 }
 ```
 
-**Requirements:**
+**Exigences :**
 
-1. `name`: required, 1–200 characters, strip whitespace
-2. `price`: a positive float (note: it arrives as a string — pydantic should coerce it)
-3. `stock`: non-negative integer
-4. `category`: must be one of `electronics`, `clothing`, `food`, `other` — case-insensitive input, stored lowercase
-5. `description`: optional, strip whitespace, store as `None` if blank
+1. `name` : obligatoire, 1 à 200 caractères, espaces retirés
+2. `price` : un float positif (il arrive en string, pydantic doit le coercer)
+3. `stock` : un entier non négatif
+4. `category` : parmi `electronics`, `clothing`, `food`, `other`, insensible à la casse en entrée, stockée en minuscules
+5. `description` : optionnelle, espaces retirés, stockée comme `None` si blanche
 
-### Starter
+### Point de départ
 
 ```python
 from pydantic import BaseModel, Field, field_validator
@@ -413,25 +398,25 @@ class ProductInput(BaseModel):
     category:    str
     description: str | None = None
 
-    # Your validators here
+    # Vos validators ici
 ```
 
-### Expected behaviour
+### Comportement attendu
 
 ```python
-# All of these should work:
+# Tous ces appels doivent fonctionner :
 ProductInput(**raw)
 # ProductInput(name='Widget Pro', price=29.99, stock=???, ...)
-# ^ stock=-3 should raise ValidationError
+# ^ stock=-3 doit lever ValidationError
 
 ProductInput(name="T-shirt", price=9.99, stock=100, category="CLOTHING")
-# category stored as "clothing"
+# category stockée "clothing"
 
 ProductInput(name="Bread", price=2.0, stock=50, category="food", description="  ")
-# description stored as None
+# description stockée None
 ```
 
-### Solution (reveal after exercise)
+### Solution (à révéler après l'exercice)
 
 ```python
 from pydantic import BaseModel, Field, field_validator
@@ -470,89 +455,81 @@ class ProductInput(BaseModel):
         return stripped if stripped else None
 ```
 
-**Discussion points after the exercise:**
+**Points de discussion après l'exercice :**
 
-- Where does this model live in a real project? (`schemas/`, `models/`, `api/inputs/`)
-- Who is responsible for calling it? (The controller/handler — not the service layer)
-- What do you do with the `ValidationError`? (Catch it at the HTTP layer, return 422 with the error body)
+- Où vit ce modèle dans un vrai projet ? (`schemas/`, `models/`, `api/inputs/`)
+- Qui est responsable de l'appeler ? (Le controller/handler, jamais la couche service)
+- Que fait-on de la `ValidationError` ? (On l'attrape à la couche HTTP et on retourne un 422 avec le corps de l'erreur)
 
 ---
 
-## Mixing Pydantic and Result — an elegant combination
+## Mélanger Pydantic et Result : une combinaison élégante
 
-The solution code does something deliberate: it uses two libraries together, each for what it
-does best.
+Le code de solution fait un choix délibéré : il associe deux bibliothèques, chacune pour ce qu'elle fait de mieux.
 
-**Pydantic** excels at the mechanical work of boundary parsing — coercion, field constraints,
-nested models. But its error surface is exceptions, which leak implementation details to callers.
+**Pydantic** excelle dans le travail mécanique du parsing à la boundary : coercion, contraintes de champs, modèles imbriqués. Son interface d'erreur repose sur des exceptions, qui exposent des détails d'implémentation aux appelants.
 
-**`returns.Result`** gives you an explicit, composable error type. But it has no built-in
-vocabulary for field-level validation rules.
+**`returns.Result`** fournit un type d'erreur explicite et composable. Il n'a pas de vocabulaire intégré pour les règles de validation au niveau des champs.
 
-The combination captures the strengths of both:
+La combinaison réunit les forces des deux :
 
 ```python
-# _ProductSchema is private — callers cannot reach it
-# Pydantic's exception-based world is fully contained inside one function
+# _ProductSchema est privé — les appelants ne peuvent pas l'atteindre
+# Le monde d'exceptions de Pydantic reste entièrement confiné dans une seule fonction
 def parse_product_input(...) -> Result[ProductInput, str]:
     try:
-        validated = _ProductSchema(...)    # Pydantic does the hard work here
-        return Success(ProductInput(...))  # clean domain object escapes
+        validated = _ProductSchema(...)    # Pydantic fait le gros du travail ici
+        return Success(ProductInput(...))  # un objet de domaine propre en sort
     except ValidationError as e:
-        return Failure(...)                # exception converted, never leaks out
+        return Failure(...)                # exception convertie, elle ne fuit jamais
 ```
 
-The result: **declarative validation rules** (Pydantic) AND **an honest return type** (Result).
-Neither library achieves this alone.
+Résultat : des **règles de validation déclaratives** (Pydantic) ET **un type de retour honnête** (Result). Aucune des deux bibliothèques n'y arrive seule.
 
-### The trade-off to be aware of
+### Le compromis à connaître
 
-We only surface the **first** validation failure. If you need all errors at once — useful for
-form validation where you want to show the user every problem in one response — you would need
-to map `e.errors()` into a richer error type than `str`. That is a deliberate choice here, not
-an oversight. For API boundaries returning 422, returning all errors is often the right call.
+Nous ne remontons que la **première** erreur de validation. Pour obtenir toutes les erreurs d'un coup, utile pour les formulaires où l'on veut montrer chaque problème dans une seule réponse, il faut mapper `e.errors()` vers un type d'erreur plus riche que `str`. C'est un choix délibéré ici. Pour des boundaries d'API qui retournent un 422, renvoyer toutes les erreurs est souvent le bon choix.
 
 ---
 
-## Key Takeaways (say these out loud at the end)
+## À retenir (à dire à voix haute en conclusion)
 
-1. **Parse at the boundary.** Don't pass raw dicts into domain logic.
-2. Keep **Pydantic schemas at the boundary**; map to domain objects immediately.
-3. Expected failures should be **`Result`**, not hidden exception paths.
-4. **Whitelist what's valid** — never blacklist what's invalid.
-5. **Your intuition about valid data is wrong.** Use libraries, not hand-rolled regexes.
-6. After the boundary, your code should never have to ask "but what if this is None?"
-
----
-
-## Common Questions
-
-**Q: Should I validate inside service methods too?**
-> Parse and normalize external input at the boundary, then pass trusted domain objects inward. Use `assert` for internal invariants. For expected failures, return `Result` so callers handle them explicitly.
-
-**Q: Isn't pydantic slow? We have a high-throughput service.**
-> Pydantic v2 is written in Rust — it's fast. For ultra-high-throughput validation, benchmark first before optimizing. In most cases it's not your bottleneck.
-
-**Q: We use Django / FastAPI / Flask — do we still need this?**
-> FastAPI uses pydantic natively — your request models ARE the boundary validators. Django REST Framework has serializers that serve the same role. The principle is the same; the tool differs.
-
-**Q: What about validating data coming from our own database?**
-> If you control the schema and the write path is validated: trust it. If you're reading from a legacy system, a shared DB, or any external store: validate it. Assume the DB can contain anything.
-
-**Q: Why only return the first error? What if I need all of them?**
-> Map `e.errors()` into a list instead of taking `[0]`. Change the return type to
-> `Result[ProductInput, list[str]]`. The pattern stays the same — only the error payload widens.
+1. **Parse at the boundary.** Ne faites pas passer de `dict` bruts dans la logique du domaine.
+2. Gardez les **schémas Pydantic à la boundary** et mappez immédiatement vers des objets du domaine.
+3. Les échecs attendus se retournent en **`Result`**, sans chemin d'exception caché.
+4. **Whitelist ce qui est valide**, ne blacklistez jamais l'invalide.
+5. **Votre intuition sur les données valides est fausse.** Utilisez des bibliothèques, sans regex écrites à la main.
+6. Après la boundary, votre code n'a plus à se demander « et si c'est `None` ? ».
 
 ---
 
-## References
+## Questions fréquentes
 
-- Pydantic v2 docs — https://docs.pydantic.dev/latest/
+**Q : Dois-je aussi valider à l'intérieur des méthodes de service ?**
+> Parsez et normalisez l'entrée externe à la boundary, puis passez des objets du domaine de confiance vers l'intérieur. Utilisez `assert` pour les invariants internes. Pour les échecs attendus, retournez un `Result` afin que les appelants les traitent explicitement.
+
+**Q : Pydantic est lent, non ? Nous avons un service à fort débit.**
+> Pydantic v2 est écrit en Rust : il est rapide. Pour une validation à très haut débit, mesurez avant d'optimiser. Dans la plupart des cas, ce n'est pas votre goulot d'étranglement.
+
+**Q : Nous utilisons Django / FastAPI / Flask. Faut-il quand même faire cela ?**
+> FastAPI utilise pydantic nativement : vos modèles de requête SONT les validators de boundary. Django REST Framework a des serializers qui jouent le même rôle. Le principe est identique, l'outil change.
+
+**Q : Et les données qui viennent de notre propre base ?**
+> Si vous contrôlez le schéma et que le chemin d'écriture est validé, faites-lui confiance. Si vous lisez depuis un système legacy, une base partagée ou tout autre store externe, validez. Partez du principe que la base peut contenir n'importe quoi.
+
+**Q : Pourquoi ne retourner que la première erreur ? Et si j'ai besoin de toutes ?**
+> Mappez `e.errors()` vers une liste au lieu de prendre `[0]`. Changez le type de retour en `Result[ProductInput, list[str]]`. Le pattern reste le même, seule la charge utile d'erreur s'élargit.
+
+---
+
+## Références
+
+- Documentation Pydantic v2 — https://docs.pydantic.dev/latest/
 - Falsehoods Programmers Believe About Names — kalzumeus.com
 - Falsehoods About Phone Numbers — github.com/googlei18n/libphonenumber
-- Python `dataclasses` docs — `__post_init__` validation pattern
-- *A Philosophy of Software Design* — Ousterhout, Chapter 10
+- Documentation Python `dataclasses` — pattern de validation `__post_init__`
+- *A Philosophy of Software Design* — Ousterhout, chapitre 10
 
 ---
 
-*Module 01 of 6 · Defensive Programming from the Trenches*
+*Module 01 sur 6 · Defensive Programming from the Trenches*
