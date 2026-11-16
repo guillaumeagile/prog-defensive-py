@@ -483,7 +483,9 @@ class BankAccount:
 >   les chaînes d'appels qui traversent plusieurs objets (`a.b.c.d()`). Ici, `amount` est un paramètre,
 >   donc un ami direct, et la lettre de la loi est respectée. Son esprit ne l'est pas : `BankAccount`
 >   connaît la représentation interne de `PositiveAmount` (un `float`). Le remède est de déplacer le
->   comportement dans le Value Object (`amount.is_greater_than(balance)`, `balance.minus(amount)`).
+>   comportement dans un Value Object `Balance`, avec des noms du vocabulaire bancaire :
+>   `balance.can_cover(amount)` pour « assez de fonds ? » et `balance.debited_by(amount)`
+>   pour « nouveau solde ».
 > - **Object Calisthenics, règle 5 : [un seul point par ligne](https://williamdurand.fr/2013/06/03/object-calisthenics/#5-one-dot-per-line)**.
 >   Un point par ligne oblige à donner un nom au comportement au lieu de naviguer dans les objets.
 >   À montrer en live : écrire `self._balance.amount.value` (deux points) et voir que le code appelle
