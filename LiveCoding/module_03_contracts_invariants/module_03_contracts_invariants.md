@@ -86,6 +86,19 @@ Lancer le fichier normalement, puis avec `python -O`. Avec `-O`, `compute_discou
 
 À dire : `__post_init__` qui lève est une **partial function**, définie sur une partie seulement de son domaine. Le smart constructor convient aux entrées utilisateur. Un constructeur qui lève convient aux données déjà validées.
 
+Pourquoi un `match` imbriqué dans le `__main__` plutôt qu'un `bind` : `PositiveAmount.create(x).bind(account.withdraw)` s'exécute, mais `mypy` et `pyright` le refusent. `bind` suppose le même type d'erreur des deux côtés, or `create` échoue avec `str` et `withdraw` avec `InsufficientFunds`. Le `match` imbriqué traite chaque erreur séparément et type sans astuce.
+
+Pour chaîner avec `bind`, les deux fonctions déclarent un type d'erreur commun, comme au module 02 :
+
+```python
+type AccountError = str | InsufficientFunds
+
+def create(value: float) -> Result[PositiveAmount, AccountError]: ...
+def withdraw(self, amount: PositiveAmount) -> Result[None, AccountError]: ...
+```
+
+Cette contrainte vient de la bibliothèque `returns` et existe aussi en Python 3.12. Le passage à Python 3.14 ne change rien à la façon d'écrire un `Result`.
+
 Point à nommer : `BankAccount` écrit toujours `amount.value > self._balance`. La règle reste dans la classe, protégée par la relecture.
 
 ### 3. Écriture 3 : `Balance` est un Value Object (`ecriture_3_balance_value_object.py`)
