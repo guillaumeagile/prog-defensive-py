@@ -98,7 +98,7 @@ Les approfondissements hors live sont dans `2_pour_aller_plus_loin/`.
 
 ## Partie 3 — Le problème : exceptions comme control flow (90 s)
 
-> **Note instructeur** : fichier `1_live/0_probleme_exceptions_invisibles.py`. À taper ou à montrer en direct. Le point porte quand le public voit la quantité de *connaissance cachée* que l'appelant transporte. Lancer le fichier : 4 utilisateurs, 4 messages.
+> **Note instructeur** : fichier `1_live/0_probleme_exceptions_invisibles.py`. À taper ou à montrer en direct. Le point porte quand le public voit la quantité de *connaissance cachée* que l'appelant transporte. Lancer le fichier : un résultat, puis le script plante sur `UserNotFoundError` avec sa stack.
 
 ```python
 # ❌ Exceptions pour des résultats attendus : impolies et invisibles

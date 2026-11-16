@@ -60,5 +60,6 @@ if __name__ == "__main__":
     account.deposit(PositiveAmount(100.0))
     account.withdraw(PositiveAmount(30.0))
     print("solde :", account.balance)
+    print("----- tentative de retrait impossible ------ ")
     # Retrait impossible : ValueError non rattrapée, on laisse la stack s'afficher.
     account.withdraw(PositiveAmount(500.0))

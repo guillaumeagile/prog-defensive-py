@@ -36,7 +36,7 @@ def get_user(user_id: int) -> User:
 - Rien dans la signature ne prévient l'appelant.
 - Chaque appelant doit redécouvrir les exceptions à gérer.
 
-<!-- Fichier : 1_live/0_probleme_exceptions_invisibles.py. Le lancer : 4 utilisateurs, 4 messages. -->
+<!-- Fichier : 1_live/0_probleme_exceptions_invisibles.py. Le lancer : un résultat, puis le script plante sur `UserNotFoundError` avec sa stack. -->
 
 ---
 

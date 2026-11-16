@@ -262,28 +262,15 @@ if __name__ == "__main__":
     resp = register_endpoint({"name": "Frank", "age": 40, "email": "frank@flaky.io"}, svc)
     print(resp)
 
-    # ── Demo 6: DatabaseConnectionError — NOBODY catches this ───────────────
-    _separator("Demo 6 — DatabaseConnectionError leaks through (CRASH)")
-    flaky_repo = FlakyDbUserRepository(fail_with=DatabaseConnectionError)
-    svc_flaky = UserRegistrationService(flaky_repo, gateway)
-    try:
-        resp = register_endpoint({"name": "Carol", "age": 28, "email": "carol@example.com"}, svc_flaky)
-        print(resp)
-    except DatabaseConnectionError as exc:
-        print(f"[UNHANDLED in endpoint] {type(exc).__name__}: {exc}")
-        print("  → The endpoint has no except clause for this. In production this would be a 500 / process crash.")
-
-    # ── Demo 7: DatabaseTimeoutError (subclass) — same problem ──────────────
-    _separator("Demo 7 — DatabaseTimeoutError (subclass) also leaks")
-    flaky_repo2 = FlakyDbUserRepository(fail_with=DatabaseTimeoutError)
-    svc_flaky2 = UserRegistrationService(flaky_repo2, gateway)
-    try:
-        resp = register_endpoint({"name": "Dave", "age": 35, "email": "dave@example.com"}, svc_flaky2)
-        print(resp)
-    except DatabaseTimeoutError as exc:
-        print(f"[UNHANDLED in endpoint] {type(exc).__name__}: {exc}")
-        print("  → Even a subclass of a known exception slips through if you didn't think of it.")
-
     print("\n[POINT] Every new exception forces updates in EVERY layer above it.")
     print("[POINT] Forgetting one except clause = silent crash in production.")
     print("[POINT] The test suite only proves what you already knew to test for.")
+
+    # ── Demo 6: DatabaseConnectionError — NOBODY catches this ───────────────
+    # Le script plante ici, avec sa stack : l'endpoint n'a aucun except pour cette erreur.
+    # Pour voir la variante sous-classe, remplacer par fail_with=DatabaseTimeoutError.
+    _separator("Demo 6 — DatabaseConnectionError leaks through (CRASH)")
+    flaky_repo = FlakyDbUserRepository(fail_with=DatabaseConnectionError)
+    svc_flaky = UserRegistrationService(flaky_repo, gateway)
+    resp = register_endpoint({"name": "Carol", "age": 28, "email": "carol@example.com"}, svc_flaky)
+    print(resp)
