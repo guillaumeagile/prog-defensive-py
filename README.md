@@ -85,3 +85,7 @@ poetry run mypy --config-file mypy.ecriture_2.ini
 ```
 
 Les modules 01 et 02 ont leurs configs dans `2_pour_aller_plus_loin/3_erreurs_typees` et `1_live/typage`. Le mode strict y signale des erreurs que les READMEs de module décrivent.
+
+## CI
+
+`.github/workflows/ci.yml` lance sur chaque PR : les tests des quatre modules (sans les démos rouges volontaires) et `pyright` strict sur le module 03. Les modules 01 et 02 signalent encore des erreurs `pyright` en strict, ils n'y figurent pas.

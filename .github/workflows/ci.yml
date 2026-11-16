@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  tests-et-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Installer Poetry et les dépendances
+        run: |
+          pip install poetry
+          poetry install
+      # Modules 02 et 03 : entièrement verts.
+      # Les modules 01 et 04 contiennent des tests rouges volontaires (démos), donc hors CI.
+      - name: Tests modules 02 et 03
+        run: poetry run pytest LiveCoding/module_02_fail_fast_ROR LiveCoding/module_03_contracts_invariants
+      - name: Tests module 01 et 04 sans les démos rouges
+        run: poetry run pytest LiveCoding/module_01_never_trust_input LiveCoding/module_04_ext_dep -k "not FAILS and not NOT_caught and not bypasses_the_service and not will_also_leak"
+      # pyright strict : module 03 sans erreur. Les modules 01 et 02 en signalent encore.
+      - name: pyright module 03
+        working-directory: LiveCoding/module_03_contracts_invariants/1_live/typage
+        run: |
+          poetry run pyright -p pyright.ecriture_1.json
+          poetry run pyright -p pyright.ecriture_2.json
+          poetry run pyright -p pyright.ecriture_3.json
