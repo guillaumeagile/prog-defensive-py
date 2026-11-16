@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import cast
 
 from ..core.result import Err, Ok, Result
 from ..ports.dtos import (
@@ -53,15 +54,7 @@ class StripePaymentGateway:
         if isinstance(parsed, Err):
             return parsed
 
-        payload = parsed.value
-        return Ok(
-            ChargeResult(
-                charge_id=payload["id"],
-                amount_cents=payload["amount"],
-                currency=payload["currency"],
-                status=payload["status"],
-            )
-        )
+        return parsed
 
     async def refund(self, request: RefundRequest) -> RefundOutcome:
         if request.amount_cents <= 0:
@@ -82,15 +75,7 @@ class StripePaymentGateway:
         if isinstance(parsed, Err):
             return parsed
 
-        payload = parsed.value
-        return Ok(
-            RefundResult(
-                refund_id=payload["id"],
-                charge_id=payload["charge"],
-                amount_cents=payload["amount"],
-                status=payload["status"],
-            )
-        )
+        return parsed
 
     async def _call_with_retry(
         self,
@@ -126,13 +111,13 @@ def _validate_charge_request(request: ChargeRequest) -> ChargeOutcome | None:
 def _decline_from_response(response: StripeResponse) -> ChargeOutcome:
     error = response.body.get("error")
     if isinstance(error, dict):
-        decline_code = error.get("decline_code")
+        decline_code = cast("dict[str, object]", error).get("decline_code")
         if isinstance(decline_code, str):
             return Err(PaymentDeclined(decline_code))
     return Err(PaymentServiceError("Stripe returned an invalid decline payload"))
 
 
-def _parse_charge_response(body: dict[str, object]) -> Result[dict[str, str | int], PaymentServiceError]:
+def _parse_charge_response(body: dict[str, object]) -> Result[ChargeResult, PaymentServiceError]:
     charge_id = body.get("id")
     amount = body.get("amount")
     currency = body.get("currency")
@@ -147,10 +132,10 @@ def _parse_charge_response(body: dict[str, object]) -> Result[dict[str, str | in
     if not isinstance(status, str):
         return Err(PaymentServiceError("Stripe charge payload is missing status"))
 
-    return Ok({"id": charge_id, "amount": amount, "currency": currency, "status": status})
+    return Ok(ChargeResult(charge_id=charge_id, amount_cents=amount, currency=currency, status=status))
 
 
-def _parse_refund_response(body: dict[str, object]) -> Result[dict[str, str | int], PaymentServiceError]:
+def _parse_refund_response(body: dict[str, object]) -> Result[RefundResult, PaymentServiceError]:
     refund_id = body.get("id")
     charge_id = body.get("charge")
     amount = body.get("amount")
@@ -165,4 +150,4 @@ def _parse_refund_response(body: dict[str, object]) -> Result[dict[str, str | in
     if not isinstance(status, str):
         return Err(PaymentServiceError("Stripe refund payload is missing status"))
 
-    return Ok({"id": refund_id, "charge": charge_id, "amount": amount, "status": status})
+    return Ok(RefundResult(refund_id=refund_id, charge_id=charge_id, amount_cents=amount, status=status))

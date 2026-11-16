@@ -9,16 +9,17 @@ including failures that only surface when real HTTP parsing code runs.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
+from typing import Any
 
 import httpx
-import pytest
 from .faulty_stripe_transport import FaultyStripeTransport
 from .http_stripe_api import HttpStripeApi
 from .result import Err, Ok
 from .dtos import ChargeRequest, ChargeResult, PaymentServiceError
 
 
-def _run(coro):
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 

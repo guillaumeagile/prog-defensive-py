@@ -90,6 +90,15 @@ Une union de dataclasses plus `match` suffit pour un `Result` : c'est le choix d
 |---|---|---|
 | 02 | `Result` maison, puis `returns` | démystifier le type, puis montrer l'outil connu |
 | 03 | `Expression` | version moderne : union fermée, covariance, aucun contournement pour `mypy` ni `pyright` |
+| 04 | `Result` maison covariant | le `Result` du module sert de port entre le domaine et les adaptateurs : `Err[PaymentServiceError]` se range dans `Err[PaymentDeclined \| PaymentServiceError]` |
+
+### Niveau de typage par module
+
+Les modules 01 et 02 restent hors `pyright` strict, par choix : ce sont des modules d'introduction, et leurs erreurs strictes illustrent les limites de `returns` et du code « avant ». À partir du module 03 l'atelier passe en `pyright` strict avec 0 erreur, vérifié par la CI. Le module 04 en fait de même.
+
+### Variance : un point d'attention
+
+Avec `pyright` 1.1.414, `class Err[E]` (syntaxe PEP 695) sur une dataclass figée donne un paramètre invariant. Pour obtenir la covariance, le `Result` du module 04 déclare `TypeVar("E_co", covariant=True)` à l'ancienne.
 
 ## Voir aussi
 

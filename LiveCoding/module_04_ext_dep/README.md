@@ -48,6 +48,17 @@ pytest LiveCoding/module_04_ext_dep/1_live                              # tout e
 pytest LiveCoding/module_04_ext_dep                                     # 29 verts, 2 échecs volontaires, voir ci-dessous
 ```
 
+## Typage
+
+Le module est en `pyright` strict, 0 erreur (tests inclus) :
+
+```bash
+cd LiveCoding/module_04_ext_dep/typage
+poetry run pyright -p pyright.module04.json
+```
+
+Le `Result` maison déclare `Ok` et `Err` covariants, ce qui permet à un `Err[PaymentServiceError]` de se ranger dans `ChargeOutcome`. Les parseurs de réponse retournent directement `ChargeResult` et `RefundResult` au lieu d'un `dict[str, str | int]`.
+
 ## Échecs volontaires
 
 Ces tests échouent exprès. Ils montrent ce qui arrive quand l'adaptateur fait confiance au fournisseur. Ne pas les « réparer ».

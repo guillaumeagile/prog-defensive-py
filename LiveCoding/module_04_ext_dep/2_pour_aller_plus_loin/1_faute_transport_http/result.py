@@ -26,7 +26,7 @@ class Ok(Generic[T]):
 class Err(Generic[E]):
     error: E
 
-    def map(self, fn) -> Err[E]:
+    def map(self, fn: Callable[..., object]) -> Err[E]:
         return self
 
     def unwrap(self):

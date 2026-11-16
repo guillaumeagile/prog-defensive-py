@@ -86,6 +86,21 @@ poetry run mypy --config-file mypy.ecriture_2.ini
 
 Les modules 01 et 02 ont leurs configs dans `2_pour_aller_plus_loin/3_erreurs_typees` et `1_live/typage`. Le mode strict y signale des erreurs que les READMEs de module décrivent.
 
+## Progression du typage
+
+Le typage se durcit au fil de l'atelier :
+
+| Module | `pyright` strict | Pourquoi |
+|---|---|---|
+| 01, 02 | non, par choix | Modules d'introduction : `returns`, le `Result` maison du module 02 et les écritures « avant » y déclenchent des erreurs que l'on laisse visibles. Le mode strict y signale des dizaines d'erreurs, décrites dans les READMEs de module |
+| 03 | oui, 0 erreur | Types précis dès l'écriture : `Expression`, Value Objects, `match` exhaustif |
+| 04 | oui, 0 erreur | Ports, adaptateurs et `Result` covariant : le typage strict garde les frontières propres |
+
+```bash
+cd LiveCoding/module_04_ext_dep/typage
+poetry run pyright -p pyright.module04.json
+```
+
 ## CI
 
-`.github/workflows/ci.yml` lance sur chaque PR : les tests des quatre modules (sans les démos rouges volontaires) et `pyright` strict sur le module 03. Les modules 01 et 02 signalent encore des erreurs `pyright` en strict, ils n'y figurent pas.
+`.github/workflows/ci.yml` lance sur chaque PR : les tests des quatre modules (sans les démos rouges volontaires) et `pyright` strict sur les modules 03 et 04.

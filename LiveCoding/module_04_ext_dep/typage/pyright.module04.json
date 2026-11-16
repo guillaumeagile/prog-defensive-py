@@ -1,0 +1,12 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.14",
+  "include": [
+    "../1_live",
+    "../2_pour_aller_plus_loin"
+  ],
+  "extraPaths": [
+    "../1_live",
+    "../2_pour_aller_plus_loin/1_faute_transport_http"
+  ]
+}

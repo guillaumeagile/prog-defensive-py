@@ -48,7 +48,7 @@ class FaultyStripeTransport(httpx.AsyncBaseTransport):
                 raise AssertionError(f"unhandled fault: {self._fault}")
 
 
-def _json_response(status: int, body: dict) -> httpx.Response:
+def _json_response(status: int, body: dict[str, object]) -> httpx.Response:
     content = json.dumps(body).encode()
     return httpx.Response(
         status,

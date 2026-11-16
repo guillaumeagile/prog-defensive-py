@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from ..core.result import Err, Ok
 from .dtos import (
@@ -11,6 +11,9 @@ from .dtos import (
     RefundRequest,
     RefundResult,
 )
+
+if TYPE_CHECKING:
+    from ..adapters.stripe_response import StripeResponse
 
 ChargeOutcome = Ok[ChargeResult] | Err[PaymentDeclined | PaymentServiceError]
 RefundOutcome = Ok[RefundResult] | Err[PaymentServiceError]
@@ -23,6 +26,6 @@ class PaymentGateway(Protocol):
 
 
 class StripeApi(Protocol):
-    async def create_payment_intent(self, request: ChargeRequest) -> object: ...
+    async def create_payment_intent(self, request: ChargeRequest) -> StripeResponse: ...
 
-    async def create_refund(self, request: RefundRequest) -> object: ...
+    async def create_refund(self, request: RefundRequest) -> StripeResponse: ...
