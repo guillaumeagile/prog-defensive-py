@@ -1,19 +1,19 @@
 import pytest
-from returns.result import Failure, Success
+from expression import Error, Ok
 
 from ecriture_1_invariant_classique import BankAccount, PositiveAmount, compute_discount
 
 
 class TestContratDeFonction:
     def test_remise_valide(self):
-        assert compute_discount(100.0, 20.0) == Success(80.0)
+        assert compute_discount(100.0, 20.0) == Ok(80.0)
 
     def test_prix_negatif_refuse(self):
-        assert compute_discount(-1.0, 20.0) == Failure("price must be >= 0")
+        assert compute_discount(-1.0, 20.0) == Error("price must be >= 0")
 
     @pytest.mark.parametrize("pct", [-1.0, 100.1])
     def test_pourcentage_hors_bornes_refuse(self, pct):
-        assert compute_discount(100.0, pct) == Failure("pct must be between 0 and 100")
+        assert compute_discount(100.0, pct) == Error("pct must be between 0 and 100")
 
 
 class TestValueObject:

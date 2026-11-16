@@ -27,6 +27,19 @@ Chaque écriture a son fichier de tests : `test_ecriture_1_invariant_classique.p
 
 Le guide (Module 03) présente les trois étapes sous forme de blocs de code et de perspectives FP. Ce dossier les rend exécutables et ajoute le point de départ `assert`. Le code utilise les annotations sans guillemets de Python 3.14 (PEP 649). Tout le dépôt cible Python 3.14.
 
+## Pourquoi `Expression` dans ce module
+
+Le module 02 écrit son `Result` à la main, puis présente `returns`. Le module 03 utilise [`Expression`](https://github.com/cognitedata/Expression), une bibliothèque inspirée de F#, pour montrer une version plus moderne du même code.
+
+| | `returns` | `Expression` |
+|---|---|---|
+| Forme de `Result[T, E]` | classe générique | union fermée `Ok[T] \| Error[E]` |
+| Type d'erreur | invariant | covariant |
+| `a.bind(f)` avec deux types d'erreur | refusé par `mypy` et `pyright` | accepté, erreur = union des deux |
+| `match` sur `Ok` / `Error` | non exhaustif pour `pyright` | exhaustif |
+
+En pratique, la démo `PositiveAmount.create(x).bind(account.withdraw)` se tape telle quelle et passe en strict sous les deux vérificateurs. Détails et comparatif des bibliothèques : [`../../python_et_style_fonctionnel.md`](../../python_et_style_fonctionnel.md).
+
 ## Pour aller plus loin (hors live)
 
 Dossier `2_pour_aller_plus_loin/`.
@@ -62,9 +75,4 @@ poetry run mypy --config-file mypy.ecriture_1.ini
 
 Remplacer `ecriture_1` par `ecriture_2` ou `ecriture_3`. Les trois écritures passent sans erreur.
 
-Deux règles `pyright` sont désactivées dans les configs :
-
-- `reportMatchNotExhaustive` : `returns` n'expose pas `Success | Failure` comme une union fermée.
-- `reportPrivateUsage` : `Balance` lit `amount._value`. La convention du guide autorise cette lecture dans le seul module qui définit les Value Objects.
-
-Le type d'erreur de `Result` est invariant : `PositiveAmount.create(x).bind(account.withdraw)` ne type pas, car `create` échoue avec `str` et `withdraw` avec `InsufficientFunds`. Les `__main__` enchaînent donc avec un `match` imbriqué.
+Une règle `pyright` est désactivée, dans `pyright.ecriture_3.json` uniquement : `reportPrivateUsage`. `Balance` lit `amount._value`. La convention du guide autorise cette lecture dans le seul module qui définit les Value Objects.

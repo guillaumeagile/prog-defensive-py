@@ -115,17 +115,17 @@ PositiveAmount(value=-1)   # ressemble à un appel normal, lève pourtant
 @classmethod
 def create(cls, value: float) -> Result[PositiveAmount, str]:
     if value <= 0:
-        return Failure(f"amount must be positive, got {value}")
-    return Success(cls(value=value))
+        return Error(f"amount must be positive, got {value}")
+    return Ok(cls(value=value))
 
 def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
     if amount.value > self._balance:
-        return Failure(InsufficientFunds(amount.value, self._balance))
+        return Error(InsufficientFunds(amount.value, self._balance))
     self._balance -= amount.value
-    return Success(None)
+    return Ok(None)
 ```
 
-L'invariant tient **par construction** : la mutation n'a lieu que sur la branche `Success`.
+L'invariant tient **par construction** : la mutation n'a lieu que sur la branche `Ok`.
 
 <!-- Fichier : 1_live/ecriture_2_result_explicite.py. 90 s.
 Choix : smart constructor pour les entrées utilisateur, constructeur qui lève pour des données déjà validées.

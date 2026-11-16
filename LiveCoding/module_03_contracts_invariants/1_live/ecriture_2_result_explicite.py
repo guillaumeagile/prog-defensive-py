@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from returns.result import Failure, Result, Success
+from expression import Error, Ok, Result
 
 
 @dataclass(frozen=True)
@@ -13,8 +13,8 @@ class PositiveAmount:
     @classmethod
     def create(cls, value: float) -> Result[PositiveAmount, str]:
         if value <= 0:
-            return Failure(f"amount must be positive, got {value}")
-        return Success(cls(value=value))
+            return Error(f"amount must be positive, got {value}")
+        return Ok(cls(value=value))
 
 
 @dataclass(frozen=True)
@@ -32,9 +32,9 @@ class BankAccount:
 
     def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
         if amount.value > self._balance:
-            return Failure(InsufficientFunds(requested=amount.value, available=self._balance))
+            return Error(InsufficientFunds(requested=amount.value, available=self._balance))
         self._balance -= amount.value
-        return Success(None)
+        return Ok(None)
 
     @property
     def balance(self) -> float:
@@ -43,17 +43,12 @@ class BankAccount:
 
 if __name__ == "__main__":
     account = BankAccount()
-    match PositiveAmount.create(100.0):
-        case Success(amount):
-            account.deposit(amount)
-        case Failure(error):
-            print(error)
-    match PositiveAmount.create(500.0):
-        case Success(amount):
-            match account.withdraw(amount):
-                case Success(_):
-                    print("retrait accepté")
-                case Failure(InsufficientFunds(requested=requested, available=available)):
-                    print(f"retrait refusé : {requested} demandé, {available} disponible")
-        case Failure(error):
-            print(error)
+    PositiveAmount.create(100.0).map(account.deposit)
+    # bind enchaîne deux erreurs de types différents : str (montant) puis InsufficientFunds (solde)
+    match PositiveAmount.create(500.0).bind(account.withdraw):
+        case Ok():
+            print("retrait accepté")
+        case Error(error=InsufficientFunds(requested=requested, available=available)):
+            print(f"retrait refusé : {requested} demandé, {available} disponible")
+        case Error(error=message):
+            print(message)

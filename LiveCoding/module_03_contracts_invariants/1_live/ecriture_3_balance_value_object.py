@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field
 
-from returns.result import Failure, Result, Success
+from expression import Error, Ok, Result
 
 
 @dataclass(frozen=True)
@@ -13,8 +13,8 @@ class PositiveAmount:
     @classmethod
     def create(cls, value: float) -> Result[PositiveAmount, str]:
         if value <= 0:
-            return Failure(f"amount must be positive, got {value}")
-        return Success(cls(value))
+            return Error(f"amount must be positive, got {value}")
+        return Ok(cls(value))
 
 
 @dataclass(frozen=True)
@@ -35,8 +35,8 @@ class Balance:
 
     def after_withdraw(self, amount: PositiveAmount) -> Result[Balance, InsufficientFunds]:
         if not self.has_enough_funds(amount):
-            return Failure(InsufficientFunds(requested=amount, available=self))
-        return Success(Balance(self._value - amount._value))
+            return Error(InsufficientFunds(requested=amount, available=self))
+        return Ok(Balance(self._value - amount._value))
 
 
 @dataclass
@@ -59,13 +59,7 @@ class BankAccount:
 
 if __name__ == "__main__":
     account = BankAccount()
-    for value in (100.0, 30.0, 500.0):
-        match PositiveAmount.create(value):
-            case Success(amount):
-                if value == 100.0:
-                    account.deposit(amount)
-                else:
-                    print(f"retrait de {value} :", account.withdraw(amount))
-            case Failure(error):
-                print(error)
+    PositiveAmount.create(100.0).map(account.deposit)
+    PositiveAmount.create(30.0).bind(account.withdraw)
     print("solde :", account.balance)
+    print("retrait de 500 :", PositiveAmount.create(500.0).bind(account.withdraw))

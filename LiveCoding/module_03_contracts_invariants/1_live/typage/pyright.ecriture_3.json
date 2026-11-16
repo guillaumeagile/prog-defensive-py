@@ -4,6 +4,5 @@
   "include": [
     "../ecriture_3_balance_value_object.py"
   ],
-  "reportMatchNotExhaustive": "none",
   "reportPrivateUsage": "none"
 }

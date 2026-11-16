@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from returns.result import Failure, Result, Success
+from expression import Error, Ok, Result
 
 
 @dataclass(frozen=True)
@@ -20,8 +20,8 @@ class ConfirmedOrder:
 
 def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
     if not order.lines:
-        return Failure("an order needs at least one line to be confirmed")
-    return Success(ConfirmedOrder(order.order_id, order.lines))
+        return Error("an order needs at least one line to be confirmed")
+    return Ok(ConfirmedOrder(order.order_id, order.lines))
 
 
 def ship(order: ConfirmedOrder) -> str:

@@ -3,17 +3,17 @@
 
 from dataclasses import dataclass
 
-from returns.result import Failure, Result, Success
+from expression import Error, Ok, Result
 
 
 # Contrat de fonction : guard clauses + postcondition explicite
 
 def compute_discount(price: float, pct: float) -> Result[float, str]:
     if price < 0:
-        return Failure("price must be >= 0")
+        return Error("price must be >= 0")
     if not (0 <= pct <= 100):
-        return Failure("pct must be between 0 and 100")
-    return Success(price * (1 - pct / 100))
+        return Error("pct must be between 0 and 100")
+    return Ok(price * (1 - pct / 100))
 
 
 # Value Object : la règle d'une seule valeur vit dans le constructeur

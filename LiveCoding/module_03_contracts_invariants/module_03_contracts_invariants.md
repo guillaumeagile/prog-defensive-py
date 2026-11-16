@@ -81,23 +81,17 @@ Lancer le fichier normalement, puis avec `python -O`. Avec `-O`, `compute_discou
 ### 2. Écriture 2 : l'échec devient explicite (`ecriture_2_result_explicite.py`)
 
 - `PositiveAmount.create` retourne un `Result` : le constructeur est une fonction totale.
-- `withdraw` retourne `Result[None, InsufficientFunds]` et ne mute que sur la branche `Success`.
+- `withdraw` retourne `Result[None, InsufficientFunds]` et ne mute que sur la branche `Ok`.
 - `_ensure_invariant()` disparaît : l'invariant tient par construction.
 
 À dire : `__post_init__` qui lève est une **partial function**, définie sur une partie seulement de son domaine. Le smart constructor convient aux entrées utilisateur. Un constructeur qui lève convient aux données déjà validées.
 
-Pourquoi un `match` imbriqué dans le `__main__` plutôt qu'un `bind` : `PositiveAmount.create(x).bind(account.withdraw)` s'exécute, mais `mypy` et `pyright` le refusent. `bind` suppose le même type d'erreur des deux côtés, or `create` échoue avec `str` et `withdraw` avec `InsufficientFunds`. Le `match` imbriqué traite chaque erreur séparément et type sans astuce.
+Pourquoi `Expression` plutôt que `returns` : `Result[T, E]` y est une union fermée `Ok[T] | Error[E]` à paramètres covariants. Deux conséquences :
 
-Pour chaîner avec `bind`, les deux fonctions déclarent un type d'erreur commun, comme au module 02 :
+- `PositiveAmount.create(x).bind(account.withdraw)` se type, même si `create` échoue avec `str` et `withdraw` avec `InsufficientFunds`. Le type d'erreur obtenu est l'union des deux. Avec `returns`, le type d'erreur est invariant : le même enchaînement est refusé par `mypy` et `pyright`.
+- Un `match` sur `Ok` et `Error` est exhaustif pour `pyright` et `mypy`, sans règle désactivée.
 
-```python
-type AccountError = str | InsufficientFunds
-
-def create(value: float) -> Result[PositiveAmount, AccountError]: ...
-def withdraw(self, amount: PositiveAmount) -> Result[None, AccountError]: ...
-```
-
-Cette contrainte vient de la bibliothèque `returns` et existe aussi en Python 3.12. Le passage à Python 3.14 ne change rien à la façon d'écrire un `Result`.
+Voir [`../../python_et_style_fonctionnel.md`](../../python_et_style_fonctionnel.md) pour le comparatif des bibliothèques et la tension entre `mypy` et `pyright`.
 
 Point à nommer : `BankAccount` écrit toujours `amount.value > self._balance`. La règle reste dans la classe, protégée par la relecture.
 
