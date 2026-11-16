@@ -2,8 +2,8 @@
 # L'interpréteur retire les `assert` avec `python -O`. La règle disparaît en production.
 #
 # Lancer :
-#   python 0_probleme_assert_evanoui.py       -> la précondition protège
-#   python -O 0_probleme_assert_evanoui.py    -> la précondition n'existe plus
+#   python 0_probleme_assert_evanoui.py       -> AssertionError et sa stack, le script s'arrête
+#   python -O 0_probleme_assert_evanoui.py    -> aucune erreur, des résultats absurdes (-40.0 puis -50.0)
 
 
 def compute_discount(price: float, pct: float) -> float:
@@ -13,8 +13,8 @@ def compute_discount(price: float, pct: float) -> float:
 
 
 if __name__ == "__main__":
-    for price, pct in [(100.0, 20.0), (-50.0, 20.0), (100.0, 150.0)]:
-        try:
-            print(f"price={price} pct={pct} ->", compute_discount(price, pct))
-        except AssertionError as error:
-            print(f"price={price} pct={pct} -> refusé : {error}")
+    print("price=100 pct=20 ->", compute_discount(100.0, 20.0))
+    # Sans -O : AssertionError avec sa stack, le script s'arrête ici.
+    # Avec -O : l'assert a disparu, le prix négatif passe et on obtient -40.0.
+    print("price=-50 pct=20 ->", compute_discount(-50.0, 20.0))
+    print("price=100 pct=150 ->", compute_discount(100.0, 150.0))

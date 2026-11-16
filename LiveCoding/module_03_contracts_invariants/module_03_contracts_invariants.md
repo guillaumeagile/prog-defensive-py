@@ -66,7 +66,7 @@ Règle pratique à poser dès le début :
 
 ### 0. Le problème : `assert` (`0_probleme_assert_evanoui.py`)
 
-Lancer le fichier normalement, puis avec `python -O`. Avec `-O`, `compute_discount(-50, 20)` retourne `-40.0`.
+Les fichiers du live ne rattrapent pas l'exception : la stack s'affiche telle quelle. Lancer le fichier normalement (`AssertionError` à la deuxième ligne), puis avec `python -O`. Avec `-O`, `compute_discount(-50, 20)` retourne `-40.0`.
 
 À dire : une précondition de domaine doit exister dans tous les modes d'exécution. On garde `assert` pour documenter une hypothèse du programmeur, jamais pour valider une entrée.
 

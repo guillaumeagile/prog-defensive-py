@@ -59,8 +59,8 @@ poetry run pytest LiveCoding/module_03_contracts_invariants    # 26 tests
 Lancer le point de départ avec et sans optimisation :
 
 ```bash
-python LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py
-python -O LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py
+python LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py     # AssertionError, stack complète
+python -O LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py  # aucune erreur, résultats négatifs
 ```
 
 ## Vérification statique

@@ -60,7 +60,5 @@ if __name__ == "__main__":
     account.deposit(PositiveAmount(100.0))
     account.withdraw(PositiveAmount(30.0))
     print("solde :", account.balance)
-    try:
-        account.withdraw(PositiveAmount(500.0))
-    except ValueError as error:
-        print("retrait refusé :", error)
+    # Retrait impossible : ValueError non rattrapée, on laisse la stack s'afficher.
+    account.withdraw(PositiveAmount(500.0))
