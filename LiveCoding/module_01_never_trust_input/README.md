@@ -42,7 +42,7 @@ Depuis la racine du dépôt :
 
 ```bash
 pytest LiveCoding/module_01_never_trust_input/1_live            # tout est vert
-pytest LiveCoding/module_01_never_trust_input                   # 4 échecs volontaires, voir ci-dessous
+pytest LiveCoding/module_01_never_trust_input                   # 3 échecs volontaires, voir ci-dessous
 ```
 
 ## Échecs volontaires
@@ -52,7 +52,8 @@ Ces tests échouent exprès. Ils servent à montrer les défauts d'un design cla
 | Test | Raison |
 |---|---|
 | `1_exceptions_contre_exemple/test_DEMO_registration_fragility.py` : 3 tests de `TestUnanticipatedExceptionsLeakThrough` | Les `pytest.raises` sont commentés, l'exception remonte jusqu'au test |
-| `4_composition_flow_bind/test_more_fp_style_pbt.py::test_property_success_name_is_always_trusted` | `parse_name` accepte un nom blanc (`" "`) et retourne `Name("")` |
+
+Le test `4_composition_flow_bind/test_more_fp_style_pbt.py::test_property_success_name_is_always_trusted` était rouge : `hypothesis` avait trouvé que `parse_name` acceptait `"\r"` et retournait `Name("")`. Corrigé (`NameBlank`), voir [`synthese.md`](2_pour_aller_plus_loin/4_composition_flow_bind/synthese.md).
 
 Le fichier `3_erreurs_typees/TestParseUserInputPBT.py` garde son nom d'origine : pytest ne le collecte pas (il ne commence pas par `test_`). Le renommer ferait apparaître un échec supplémentaire.
 

@@ -1,8 +1,10 @@
+import pytest
 from returns.result import Failure, Success
 
 from solution_more_fp_style import (
     AgeOutOfRange,
     EmailMissingAt,
+    NameBlank,
     NameEmpty,
     NameTooLong,
     ParsedUserInput,
@@ -57,6 +59,12 @@ class TestParseUserInputDomainRules:
         result = parse_user_input(name="", age=30, email="alice@example.com")
         assert isinstance(result, Failure)
         assert isinstance(result.failure(), NameEmpty)
+
+    @pytest.mark.parametrize("raw_name", ["   ", "\t", "\r", "\n  \n"])
+    def test_blank_name_returns_name_blank(self, raw_name: str):
+        result = parse_user_input(name=raw_name, age=30, email="alice@example.com")
+        assert isinstance(result, Failure)
+        assert isinstance(result.failure(), NameBlank)
 
     def test_name_over_100_returns_name_too_long(self):
         result = parse_user_input(name="x" * 101, age=30, email="alice@example.com")

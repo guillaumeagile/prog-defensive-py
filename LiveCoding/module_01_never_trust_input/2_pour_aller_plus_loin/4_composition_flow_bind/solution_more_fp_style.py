@@ -99,6 +99,8 @@ def parse_name(raw_name: str) -> Result[Name, ParseUserError]:
     if raw_name == "":
         return Failure(NameEmpty())
     stripped = raw_name.strip()
+    if stripped == "":
+        return Failure(NameBlank(raw_name=raw_name))
     if len(stripped) > 100:
         return Failure(NameTooLong(length=len(stripped), max_length=100))
     return Success(Name(value=stripped))
