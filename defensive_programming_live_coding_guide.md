@@ -373,6 +373,14 @@ def compute_discount(price: float, pct: float) -> Result[float, str]:
 - Preconditions : `price >= 0`, `0 <= pct <= 100`
 - Postcondition : l'appelant reçoit toujours un `Result` (aucun `None` caché)
 
+> **Le réflexe Pythonic : `assert`**
+>
+> Un développeur Python met naturellement des `assert price >= 0` en tête de fonction.
+> C'est lisible, mais l'interpréteur ignore les `assert` avec `python -O`. La précondition disparaît alors en production.
+> Une précondition de domaine doit exister dans tous les modes d'exécution : on la déplace dans le
+> constructeur d'un type (voir plus bas) ou dans une garde qui retourne un `Result`.
+> Gardons `assert` pour documenter une hypothèse du programmeur, jamais pour valider une entrée.
+
 ---
 
 **Value Object — deux styles**
@@ -426,6 +434,15 @@ class PositiveAmount:
 
 **Pattern d'invariant de classe (pour les règles entre champs / d'état)**
 
+Un Value Object suffit tant que la règle porte sur un seul état (`PositiveAmount`).
+Dès que la règle relie une valeur à un état qui évolue (« un retrait ne peut pas dépasser le solde »),
+le réflexe courant est de passer à un objet mutable avec un invariant de classe.
+On part de cette forme traditionnelle, que l'audience connaît, puis on la fait évoluer en trois étapes :
+
+1. **Étape 1 : invariant de classe traditionnel** (ci-dessous). Objet mutable, `raise`.
+2. **Étape 2 : l'échec devient explicite au site d'appel** (`Result`).
+3. **Étape 3 : design FP presque pur**. L'état lui-même devient un Value Object qui porte sa règle.
+
 ```python
 # Pythonic: mutable object, invariant checked after each transition
 @dataclass
@@ -449,6 +466,15 @@ class BankAccount:
         self._balance -= amount.value
         self._ensure_invariant()
 ```
+
+> **À pointer pendant le live : `amount.value`**
+>
+> Regardez `deposit` et `withdraw`. `BankAccount` ouvre `PositiveAmount`, extrait le `float`,
+> puis refait l'arithmétique et la comparaison elle-même. Le code ne fait donc pas confiance au Value Object.
+> Il s'en sert comme d'une boîte à `float`, parce que `PositiveAmount` ne sait rien faire de métier :
+> il garantit seulement `> 0`. La logique « assez de fonds ? » et « nouveau solde » vit ailleurs, dans
+> la classe, et `_balance` reste un `float` nu que l'invariant doit surveiller après chaque mutation.
+> Chaque `.value` signale une règle métier qui n'a pas encore trouvé son type.
 
 > **Perspective FP — rendre l'échec explicite au site d'appel**
 >
@@ -482,6 +508,74 @@ class BankAccount:
 > de descendre sous zéro et dit pourquoi à l'appelant, au lieu de lever après coup.
 > Plus besoin d'un appel externe à `_ensure_invariant()`, car la mutation n'a lieu que sur la
 > branche `Success`.
+>
+> C'est un premier pas. `BankAccount` manipule toujours des `float` et compare `amount.value > self._balance`
+> elle-même : la règle reste dans la classe, protégée par une discipline de relecture.
+
+> **Perspective FP — design presque pur : le solde devient un Value Object**
+>
+> On applique deux règles à `BankAccount` :
+>
+> - elle ne manipule plus aucun `float` ;
+> - elle ne lit jamais l'intérieur d'un Value Object (`.value`, `._value`).
+>
+> Toute question et toute arithmétique passent par des opérations sur les types `Balance` et `PositiveAmount`.
+> Les `float` ne sont touchés que dans le module qui définit ces Value Objects, le seul endroit
+> où la règle « jamais négatif » existe.
+>
+> ```python
+> @dataclass(frozen=True)
+> class InsufficientFunds:
+>     requested: PositiveAmount   # des VO, plus de float
+>     available: "Balance"
+>
+>
+> @dataclass(frozen=True)
+> class Balance:
+>     _value: float = 0.0  # privé par convention : seul ce module le lit
+>
+>     def has_enough_funds(self, amount: PositiveAmount) -> bool:
+>         return amount._value <= self._value
+>
+>     def after_deposit(self, amount: PositiveAmount) -> "Balance":
+>         return Balance(self._value + amount._value)  # total : un dépôt réussit toujours
+>
+>     def after_withdraw(self, amount: PositiveAmount) -> Result["Balance", InsufficientFunds]:
+>         if not self.has_enough_funds(amount):
+>             return Failure(InsufficientFunds(requested=amount, available=self))
+>         return Success(Balance(self._value - amount._value))
+>
+>
+> @dataclass
+> class BankAccount:
+>     _balance: Balance = field(default_factory=Balance)
+>
+>     def deposit(self, amount: PositiveAmount) -> None:
+>         self._balance = self._balance.after_deposit(amount)
+>
+>     def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
+>         return self._balance.after_withdraw(amount).map(self._replace_balance)
+>
+>     def _replace_balance(self, new_balance: Balance) -> None:
+>         self._balance = new_balance
+> ```
+>
+> Ce que l'audience doit voir :
+>
+> - `Balance` **porte sa propre précondition**. Il n'existe aucun chemin pour fabriquer un solde négatif,
+>   donc `_ensure_invariant()` disparaît.
+> - `BankAccount` ne contient plus aucune règle. Elle orchestre : elle demande un nouveau `Balance`
+>   et le range si l'opération réussit.
+> - Les opérations se **composent** par les types : `after_withdraw` retourne un `Result`, qu'on enchaîne
+>   avec `.map` / `.bind` (`solde.after_withdraw(a).bind(lambda s: s.after_withdraw(b))`).
+>   C'est une monade en devenir : on compose des opérations qui peuvent échouer
+>   sans jamais ouvrir la valeur.
+> - Le critère de qualité : si on réécrit `Balance` avec des `Decimal` ou des centimes entiers,
+>   `BankAccount` ne change pas d'une ligne.
+>
+> Note Python : les noms des méthodes sont en `snake_case` (`has_enough_funds`, `after_withdraw`).
+> L'objet `BankAccount` reste mutable (il remplace son `Balance`) ; seules les valeurs sont immuables.
+> Une version entièrement pure retournerait un nouveau `BankAccount` à chaque opération.
 
 ---
 
@@ -491,6 +585,8 @@ Pattern à dire à voix haute :
 3. Revérifier l'invariant après chaque transition d'état.
 4. Pour les **échecs de domaine** (attendus, récupérables), préférer `Result` à `raise`.
 5. Réserver `raise` aux **erreurs de programmation** : les conditions qui ne devraient jamais se produire si le code est correct.
+6. Quand le code extrait la valeur d'un Value Object (`.value`) pour raisonner dessus, déplacer ce raisonnement
+   dans le Value Object : `has_enough_funds`, `after_withdraw`. L'objet qui possède la règle l'applique.
 
 **Illegal states unrepresentable (contrat au niveau des types)**
 ```python
