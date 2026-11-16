@@ -467,7 +467,45 @@ class BankAccount:
         self._ensure_invariant()
 ```
 
-> **À pointer pendant le live : `amount.value`**
+**Etape 2:  Perspective FP — rendre l'échec explicite au site d'appel**
+
+`withdraw` lève pour un événement de domaine attendu (fonds insuffisants).
+La version FP-consistent retourne un `Result`, pour que l'appelant voie l'échec dans le type :
+
+```python
+@dataclass(frozen=True)
+class InsufficientFunds:
+    requested: float
+    available: float
+
+
+@dataclass
+class BankAccount:
+    _balance: float = 0.0
+
+    def deposit(self, amount: PositiveAmount) -> None:
+        self._balance += amount.value  # always succeeds given PositiveAmount
+
+    def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
+        if amount.value > self._balance:
+            return Failure(InsufficientFunds(
+                requested=amount.value, available=self._balance
+            ))
+        self._balance -= amount.value
+        return Success(None)
+```
+
+L'invariant `_balance >= 0` tient maintenant **par construction** : `withdraw` refuse simplement
+de descendre sous zéro et dit pourquoi à l'appelant, au lieu de lever après coup.
+Plus besoin d'un appel externe à `_ensure_invariant()`, car la mutation n'a lieu que sur la
+branche `Success`.
+
+C'est un premier pas. `BankAccount` manipule toujours des `float` et compare `amount.value > self._balance`
+elle-même : la règle reste dans la classe, protégée par une discipline de relecture.
+
+
+
+> **À pointer   : `amount.value`**
 >
 > Regardez `deposit` et `withdraw`. `BankAccount` ouvre `PositiveAmount`, extrait le `float`,
 > puis refait l'arithmétique et la comparaison elle-même. Le code ne fait donc pas confiance au Value Object.
@@ -492,106 +530,71 @@ class BankAccount:
   un nouveau type. La règle de William Durand et la loi de Déméter décrivent le même symptôme,
   un objet qui connaît la structure interne d'un autre.
 
-> **Perspective FP — rendre l'échec explicite au site d'appel**
->
-> `withdraw` lève pour un événement de domaine attendu (fonds insuffisants).
-> La version FP-consistent retourne un `Result`, pour que l'appelant voie l'échec dans le type :
->
-> ```python
-> @dataclass(frozen=True)
-> class InsufficientFunds:
->     requested: float
->     available: float
->
->
-> @dataclass
-> class BankAccount:
->     _balance: float = 0.0
->
->     def deposit(self, amount: PositiveAmount) -> None:
->         self._balance += amount.value  # always succeeds given PositiveAmount
->
->     def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
->         if amount.value > self._balance:
->             return Failure(InsufficientFunds(
->                 requested=amount.value, available=self._balance
->             ))
->         self._balance -= amount.value
->         return Success(None)
-> ```
->
-> L'invariant `_balance >= 0` tient maintenant **par construction** : `withdraw` refuse simplement
-> de descendre sous zéro et dit pourquoi à l'appelant, au lieu de lever après coup.
-> Plus besoin d'un appel externe à `_ensure_invariant()`, car la mutation n'a lieu que sur la
-> branche `Success`.
->
-> C'est un premier pas. `BankAccount` manipule toujours des `float` et compare `amount.value > self._balance`
-> elle-même : la règle reste dans la classe, protégée par une discipline de relecture.
 
-> **Perspective FP — design presque pur : le solde devient un Value Object**
->
-> On applique deux règles à `BankAccount` :
->
-> - elle ne manipule plus aucun `float` ;
-> - elle ne lit jamais l'intérieur d'un Value Object (`.value`, `._value`).
->
-> Toute question et toute arithmétique passent par des opérations sur les types `Balance` et `PositiveAmount`.
-> Les `float` ne sont touchés que dans le module qui définit ces Value Objects, le seul endroit
-> où la règle « jamais négatif » existe.
->
-> ```python
-> @dataclass(frozen=True)
-> class InsufficientFunds:
->     requested: PositiveAmount   # des VO, plus de float
->     available: "Balance"
->
->
-> @dataclass(frozen=True)
-> class Balance:
->     _value: float = 0.0  # privé par convention : seul ce module le lit
->
->     def has_enough_funds(self, amount: PositiveAmount) -> bool:
->         return amount._value <= self._value
->
->     def after_deposit(self, amount: PositiveAmount) -> "Balance":
->         return Balance(self._value + amount._value)  # total : un dépôt réussit toujours
->
->     def after_withdraw(self, amount: PositiveAmount) -> Result["Balance", InsufficientFunds]:
->         if not self.has_enough_funds(amount):
->             return Failure(InsufficientFunds(requested=amount, available=self))
->         return Success(Balance(self._value - amount._value))
->
->
-> @dataclass
-> class BankAccount:
->     _balance: Balance = field(default_factory=Balance)
->
->     def deposit(self, amount: PositiveAmount) -> None:
->         self._balance = self._balance.after_deposit(amount)
->
->     def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
->         return self._balance.after_withdraw(amount).map(self._replace_balance)
->
->     def _replace_balance(self, new_balance: Balance) -> None:
->         self._balance = new_balance
-> ```
->
-> Ce que l'audience doit voir :
->
-> - `Balance` **porte sa propre précondition**. Il n'existe aucun chemin pour fabriquer un solde négatif,
->   donc `_ensure_invariant()` disparaît.
-> - `BankAccount` ne contient plus aucune règle. Elle orchestre : elle demande un nouveau `Balance`
->   et le range si l'opération réussit.
-> - Les opérations se **composent** par les types : `after_withdraw` retourne un `Result`, qu'on enchaîne
->   avec `.map` / `.bind` (`solde.after_withdraw(a).bind(lambda s: s.after_withdraw(b))`).
->   C'est une monade en devenir : on compose des opérations qui peuvent échouer
->   sans jamais ouvrir la valeur.
-> - Le critère de qualité : si on réécrit `Balance` avec des `Decimal` ou des centimes entiers,
->   `BankAccount` ne change pas d'une ligne.
->
-> Note Python : les noms des méthodes sont en `snake_case` (`has_enough_funds`, `after_withdraw`).
-> L'objet `BankAccount` reste mutable (il remplace son `Balance`) ; seules les valeurs sont immuables.
-> Une version entièrement pure retournerait un nouveau `BankAccount` à chaque opération.
+**Etape 3 : Perspective FP — design presque pur : le solde devient un Value Object**
+
+On applique deux règles à `BankAccount` :
+
+- elle ne manipule plus aucun `float` ;
+- elle ne lit jamais l'intérieur d'un Value Object (`.value`, `._value`).
+
+Toute question et toute arithmétique passent par des opérations sur les types `Balance` et `PositiveAmount`.
+Les `float` ne sont touchés que dans le module qui définit ces Value Objects, le seul endroit
+où la règle « jamais négatif » existe.
+
+```python
+@dataclass(frozen=True)
+class InsufficientFunds:
+    requested: PositiveAmount   # des VO, plus de float
+    available: "Balance"
+
+
+@dataclass(frozen=True)
+class Balance:
+    _value: float = 0.0  # privé par convention : seul ce module le lit
+
+    def has_enough_funds(self, amount: PositiveAmount) -> bool:
+        return amount._value <= self._value
+
+    def after_deposit(self, amount: PositiveAmount) -> "Balance":
+        return Balance(self._value + amount._value)  # total : un dépôt réussit toujours
+
+    def after_withdraw(self, amount: PositiveAmount) -> Result["Balance", InsufficientFunds]:
+        if not self.has_enough_funds(amount):
+            return Failure(InsufficientFunds(requested=amount, available=self))
+        return Success(Balance(self._value - amount._value))
+
+
+@dataclass
+class BankAccount:
+    _balance: Balance = field(default_factory=Balance)
+
+    def deposit(self, amount: PositiveAmount) -> None:
+        self._balance = self._balance.after_deposit(amount)
+
+    def withdraw(self, amount: PositiveAmount) -> Result[None, InsufficientFunds]:
+        return self._balance.after_withdraw(amount).map(self._replace_balance)
+
+    def _replace_balance(self, new_balance: Balance) -> None:
+        self._balance = new_balance
+```
+
+Ce que l'audience doit voir :
+
+- `Balance` **porte sa propre précondition**. Il n'existe aucun chemin pour fabriquer un solde négatif,
+  donc `_ensure_invariant()` disparaît.
+- `BankAccount` ne contient plus aucune règle. Elle orchestre : elle demande un nouveau `Balance`
+  et le range si l'opération réussit.
+- Les opérations se **composent** par les types : `after_withdraw` retourne un `Result`, qu'on enchaîne
+  avec `.map` / `.bind` (`solde.after_withdraw(a).bind(lambda s: s.after_withdraw(b))`).
+  C'est une monade en devenir : on compose des opérations qui peuvent échouer
+  sans jamais ouvrir la valeur.
+- Le critère de qualité : si on réécrit `Balance` avec des `Decimal` ou des centimes entiers,
+  `BankAccount` ne change pas d'une ligne.
+
+Note Python : les noms des méthodes sont en `snake_case` (`has_enough_funds`, `after_withdraw`).
+L'objet `BankAccount` reste mutable (il remplace son `Balance`) ; seules les valeurs sont immuables.
+Une version entièrement pure retournerait un nouveau `BankAccount` à chaque opération.
 
 ---
 
