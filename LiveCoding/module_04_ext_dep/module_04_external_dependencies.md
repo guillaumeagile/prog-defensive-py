@@ -1,143 +1,143 @@
-# Module 04 — Handling External Dependencies
-## Detailed Lesson Plan · ~10 minutes live · Defensive Programming from the Trenches
+# Module 04 — Gérer les dépendances externes
+## Plan détaillé · ~10 minutes en live · Defensive Programming from the Trenches
 
-> *"Everything outside your process is hostile: APIs, queues, the filesystem, time itself.*
-> *Not malicious — hostile. It will be slow, unavailable, wrong-shaped, and it will succeed on the first call then fail on the retry."*
+> *« Tout ce qui est hors de votre process est hostile : APIs, files de messages, système de fichiers, le temps lui-même.*
+> *L'hostilité est ici de l'indifférence : ce monde sera lent, indisponible, de forme inattendue, et il réussira au premier appel pour échouer au retry. »*
 
 ---
 
-## Overview
+## Vue d'ensemble
 
 | | |
 |---|---|
-| **Duration** | 10 minutes live |
-| **Core principle** | The outside world is untrusted input at scale — apply M01's boundary thinking and M02's explicit failures to every process crossing |
-| **Python focus** | `typing.Protocol`, adapter pattern, `httpx` async, `stamina` retry, fake over mock, pytest DI |
-| **Builds on** | M01 (validate at the boundary), M02 (explicit failures as `Result` types) |
-| **Audience takeaway** | Design the interface first, fake it for tests, plug in the real thing via DI — the test suite runs both |
+| **Durée** | 10 minutes en live |
+| **Principe central** | Le monde extérieur est une entrée non fiable à grande échelle : appliquer la frontière du M01 et les échecs explicites du M02 à chaque traversée de process |
+| **Focus Python** | `typing.Protocol`, pattern adaptateur, `httpx` async, retry avec `stamina`, fake plutôt que mock, injection de dépendances avec pytest |
+| **S'appuie sur** | M01 (valider à la frontière), M02 (échecs explicites sous forme de `Result`) |
+| **Message pour l'audience** | Concevoir l'interface d'abord, la simuler pour les tests, brancher le réel par injection : la même suite de tests tourne sur les deux |
 
 ---
 
-## Learning Objectives
+## Objectifs d'apprentissage
 
-1. Design an adapter interface using `typing.Protocol` as the seam between your code and the outside world
-2. Build a self-made fake that fully implements the interface — no mock library
-3. Write tests against the fake that cover all behavior cases — happy and unhappy paths
-4. Apply the same test suite to the production implementation via pytest fixture parametrization
-5. Apply timeouts, bounded retry, and response validation inside the adapter
-6. Explain why fakes are superior to mocks for contract testing
+1. Concevoir une interface d'adaptateur avec `typing.Protocol` comme couture entre votre code et le monde extérieur
+2. Écrire un fake maison qui implémente toute l'interface, sans bibliothèque de mock
+3. Écrire des tests contre le fake qui couvrent tous les comportements : chemins heureux et malheureux
+4. Appliquer la même suite de tests à l'implémentation de production via une fixture pytest paramétrée
+5. Poser timeouts, retry borné et validation des réponses dans l'adaptateur
+6. Expliquer pourquoi les fakes valent mieux que les mocks pour tester un contrat
 
 ---
 
-## Facilitator Timing
+## Timing de l'animateur
 
 ```
-00:00 — 00:45   Hook: the hostile outside world (45s)
-00:45 — 01:30   Concept: M01 + M02 at the boundary (45s)
-01:30 — 02:30   The adapter pattern: design the seam first (60s)
-02:30 — 03:30   Protocol as interface (60s)
-03:30 — 05:00   The fake implementation (90s)
-05:00 — 06:00   Tests against the fake — all behavior cases (60s)
-06:00 — 07:00   The real Stripe adapter (60s)
-07:00 — 08:00   DI in tests: same suite, two implementations (60s)
-08:00 — 09:00   Timeout + retry inside the adapter (60s)
-09:00 — 09:30   Circuit breaker + idempotency (30s)
-09:30 — 10:00   Wrap (30s)
+00:00 — 00:45   Accroche : le monde extérieur hostile (45 s)
+00:45 — 01:30   Concept : M01 + M02 à la frontière (45 s)
+01:30 — 02:30   Le pattern adaptateur : dessiner la couture d'abord (60 s)
+02:30 — 03:30   Protocol comme interface (60 s)
+03:30 — 05:00   L'implémentation fake (90 s)
+05:00 — 06:00   Tests contre le fake : tous les cas de comportement (60 s)
+06:00 — 07:00   L'adaptateur Stripe réel (60 s)
+07:00 — 08:00   Injection en test : même suite, deux implémentations (60 s)
+08:00 — 09:00   Timeout + retry dans l'adaptateur (60 s)
+09:00 — 09:30   Circuit breaker + idempotence (30 s)
+09:30 — 10:00   Conclusion (30 s)
 ```
 
 ---
 
-## Part 1 — Hook (45s)
+## Partie 1 — Accroche (45 s)
 
-**Open with this:**
+**Ouvrir avec :**
 
-> "Everything we've covered so far — validate at the boundary, fail explicitly, encode failures in the type — assumes *you* wrote the other side. You control the data model. You control what goes in and comes out."
+> « Tout ce que nous avons vu jusqu'ici (valider à la frontière, échouer explicitement, encoder l'échec dans le type) suppose que *vous* avez écrit l'autre côté. Vous maîtrisez le modèle de données. Vous maîtrisez ce qui entre et ce qui sort. »
 
 **Pause.**
 
-> "External dependencies break that assumption completely. An HTTP API can return 200 with an error in the body. It can hang for 30 seconds then timeout. It can succeed on your first call and fail on the retry — because your retry triggered a duplicate charge."
+> « Les dépendances externes cassent complètement cette hypothèse. Une API HTTP peut renvoyer 200 avec une erreur dans le corps. Elle peut se bloquer 30 secondes avant d'expirer. Elle peut réussir au premier appel et échouer au retry, parce que votre retry a déclenché un second débit. »
 
-**The frame:**
+**Le cadre :**
 
-> "The outside world is not malicious. It's just indifferent to your correctness. Your job is to build a defensive perimeter at every point your code crosses a process boundary — and to design that perimeter so you can test it without hitting the real thing."
+> « Le monde extérieur est indifférent à votre exactitude. Votre travail consiste à bâtir un périmètre défensif à chaque point où votre code franchit une frontière de process, et à le concevoir de façon à le tester sans toucher au vrai service. »
 
-### ⚔ War story slot
+### ⚔ Emplacement de la war story
 
-> *Your story here. High-value options:*
-> - *A retry without idempotency that charged a customer twice*
-> - *A call with no timeout that held a connection pool thread for 40 minutes*
-> - *A third-party deploy that changed a field name — silent `None` propagation downstream*
-> - *A mock that passed tests but didn't match what the real API actually returned*
-
----
-
-## Part 2 — Concept: M01 + M02 at the Boundary (45s)
-
-**Bridge from M01 and M02:**
-
-```
-M01 — validate at boundary:    API response = untrusted input. Validate the shape.
-M02 — explicit failures:       Network errors = Result[T, E]. Not exceptions.
-M04 — both, under pressure:    Slow, wrong-shaped, lying, and you retry it.
-```
-
-**The three rules:**
-
-> 1. Every external call gets a timeout. Always.
-> 2. Every response gets validated. Never trust the shape.
-> 3. Every state-changing operation is designed to be safe to retry.
-
-**And one more, today's addition:**
-
-> 4. Design the interface first. The real implementation is a plugin.
+> *Votre histoire ici. Pistes à forte valeur :*
+> - *Un retry sans idempotence qui a débité un client deux fois*
+> - *Un appel sans timeout qui a retenu un thread du pool de connexions pendant 40 minutes*
+> - *Un déploiement chez un tiers qui a renommé un champ : des `None` propagés en silence en aval*
+> - *Un mock qui passait les tests mais ne correspondait pas à ce que l'API réelle renvoyait*
 
 ---
 
-## Part 3 — The Adapter Pattern: Design the Seam First (60s)
+## Partie 2 — Concept : M01 + M02 à la frontière (45 s)
 
-The core idea: **your business logic should never know it's talking to Stripe**.
-
-It talks to a `PaymentGateway` abstraction (Outbound Port), and your production adapter (Driven Adapter) plugged into it is a separate implementation.
+**Pont depuis M01 et M02 :**
 
 ```
-[ core/ (Hexagonal Core) ]   ──────►   [ ports/ (Abstractions) ]
+M01 — valider à la frontière :  réponse d'API = entrée non fiable. Valider la forme.
+M02 — échecs explicites :       erreurs réseau = Result[T, E]. Pas d'exceptions.
+M04 — les deux, sous pression : lent, de forme inattendue, menteur, et vous le rejouez.
+```
+
+**Les trois règles :**
+
+> 1. Chaque appel externe a un timeout. Toujours.
+> 2. Chaque réponse est validée. Ne jamais faire confiance à la forme.
+> 3. Chaque opération qui change un état est conçue pour être rejouable sans danger.
+
+**Et une règle d'aujourd'hui :**
+
+> 4. Concevoir l'interface d'abord. L'implémentation réelle est un plugin.
+
+---
+
+## Partie 3 — Le pattern adaptateur : dessiner la couture d'abord (60 s)
+
+L'idée centrale : **votre logique métier ne doit jamais savoir qu'elle parle à Stripe**.
+
+Elle parle à une abstraction `PaymentGateway` (port sortant). Votre adaptateur de production (adaptateur piloté) se branche dessus comme une implémentation séparée.
+
+```
+[ core/ (cœur hexagonal) ]   ──────►   [ ports/ (abstractions) ]
 - payment_processor.py                 - payment_gateway.py (Protocol)
-- result.py                            - dtos.py (Data contracts)
+- result.py                            - dtos.py (contrats de données)
                                                      ▲
                                                      │
-                                       [ adapters/ (Plugins) ]
+                                       [ adapters/ (plugins) ]
                                        - fake_payment_gateway.py
                                        - stripe_payment_gateway.py
 ```
 
-**Why this matters:**
+**Pourquoi c'est important :**
 
-- Your core domain logic (`core/`) is entirely pure — it doesn't import or depend on network clients, frameworks, or Stripe.
-- Switching payment providers means writing a new adapter in `adapters/`, not touching business logic in `core/`.
-- The interface and its contracts (`ports/`) define the strict boundaries of what enters or leaves your system.
-- The test suite that runs against the fake *also* runs against Stripe — same contract, different adapter.
+- Votre logique de domaine (`core/`) est entièrement pure : elle n'importe aucun client réseau, aucun framework, ni Stripe.
+- Changer de fournisseur de paiement revient à écrire un nouvel adaptateur dans `adapters/`, sans toucher à la logique métier de `core/`.
+- L'interface et ses contrats (`ports/`) fixent les frontières strictes de ce qui entre et sort de votre système.
+- La suite de tests qui tourne contre le fake tourne *aussi* contre Stripe : même contrat, autre adaptateur.
 
-**Say:** "The interface is not boilerplate. It's the most important design decision you'll make about this dependency. Get the interface right and everything else is a detail."
+**À dire :** « L'interface est la décision de conception la plus importante que vous prendrez sur cette dépendance. Si l'interface est juste, le reste est un détail. »
 
 ---
 
-## Part 4 — Protocol as Interface (60s)
+## Partie 4 — Protocol comme interface (60 s)
 
-Python gives us two ways to define an interface. Start with `Protocol`.
+Python offre deux façons de définir une interface. On commence par `Protocol`.
 
-### `typing.Protocol` — structural subtyping
+### `typing.Protocol` — sous-typage structurel
 
 ```python
 from typing import Protocol
 from dataclasses import dataclass
 
-# Value types — what flows across the interface
+# Types valeur — ce qui circule à travers l'interface
 @dataclass(frozen=True)
 class ChargeRequest:
-    amount_cents:    int      # always work in cents — floats and money don't mix
+    amount_cents:    int      # toujours en centimes : flottants et argent ne se mélangent pas
     currency:        str      # "EUR", "USD", "GBP"
     customer_id:     str
-    idempotency_key: str      # caller's responsibility to generate
+    idempotency_key: str      # à la charge de l'appelant de la générer
 
 @dataclass(frozen=True)
 class ChargeResult:
@@ -149,7 +149,7 @@ class ChargeResult:
 @dataclass(frozen=True)
 class RefundRequest:
     charge_id:       str
-    amount_cents:    int      # partial refund supported
+    amount_cents:    int      # remboursement partiel possible
     idempotency_key: str
 
 @dataclass(frozen=True)
@@ -159,7 +159,7 @@ class RefundResult:
     amount_cents: int
     status:       str
 
-# Error types
+# Types d'erreur
 @dataclass(frozen=True)
 class PaymentDeclined:
     reason: str
@@ -171,15 +171,15 @@ class PaymentServiceError:
 ChargeOutcome = Ok[ChargeResult] | Err[PaymentDeclined | PaymentServiceError]
 RefundOutcome = Ok[RefundResult] | Err[PaymentServiceError]
 
-# The interface — structural, no inheritance required
+# L'interface — structurelle, sans héritage
 class PaymentGateway(Protocol):
     async def charge(self, request: ChargeRequest) -> ChargeOutcome: ...
     async def refund(self, request: RefundRequest) -> RefundOutcome: ...
 ```
 
-**Say:** "Protocol is structural subtyping — duck typing with type checking. Any class that implements `charge` and `refund` with the right signatures *is* a `PaymentGateway`, without inheriting from it. mypy enforces this. No registration, no base class noise."
+**À dire :** « Protocol est du sous-typage structurel : du duck typing avec vérification de types. Toute classe qui implémente `charge` et `refund` avec les bonnes signatures *est* un `PaymentGateway`, sans en hériter. mypy le vérifie. Aucun enregistrement, aucune classe de base. »
 
-### ABC — the alternative (mention briefly)
+### ABC — l'alternative (à mentionner brièvement)
 
 ```python
 from abc import ABC, abstractmethod
@@ -190,43 +190,43 @@ class PaymentGateway(ABC):
     @abstractmethod
     async def refund(self, request: RefundRequest) -> RefundOutcome: ...
 
-# Difference: explicit inheritance required, enforced at instantiation time
-# Use ABC when you want runtime enforcement even without mypy
-# Use Protocol when you want structural typing and maximum flexibility
+# Différence : héritage explicite requis, vérifié à l'instanciation
+# ABC : quand on veut une garantie à l'exécution même sans mypy
+# Protocol : quand on veut du typage structurel et un maximum de souplesse
 ```
 
-**Say:** "ABC enforces the contract at instantiation — you'll get a `TypeError` if you forget to implement a method, even without a type checker. Protocol enforces it at type-check time. In a well-typed codebase, Protocol is cleaner. In a mixed or legacy codebase, ABC gives you a safety net at runtime."
+**À dire :** « ABC impose le contrat à l'instanciation : un `TypeError` apparaît si vous oubliez une méthode, même sans vérificateur de types. Protocol l'impose au moment du type-check. Dans une base de code bien typée, Protocol est plus propre. Dans une base mixte ou héritée, ABC offre un filet de sécurité à l'exécution. »
 
 ---
 
-## Part 5 — The Fake Implementation (90s)
+## Partie 5 — L'implémentation fake (90 s)
 
-> *"A fake is a real implementation — lightweight, in-memory, no network. Not a mock. A mock replaces calls with assertions. A fake replaces the system with a simpler one that behaves correctly."*
+> *« Un fake est une vraie implémentation : légère, en mémoire, sans réseau. Un mock remplace des appels par des assertions. Un fake remplace le système par un système plus simple qui se comporte correctement. »*
 
 ```python
 import uuid
 
 class FakePaymentGateway:
     """
-    In-memory payment gateway for tests and local development.
-    Implements the full PaymentGateway Protocol.
-    No network. No external state. Fully controllable.
+    Passerelle de paiement en mémoire pour les tests et le développement local.
+    Implémente tout le Protocol PaymentGateway.
+    Aucun réseau. Aucun état externe. Entièrement pilotable.
     """
 
     def __init__(self):
         self._charges: dict[str, ChargeResult] = {}
         self._refunds:  dict[str, RefundResult] = {}
-        # Test control points — configure failure modes from the test
+        # Points de contrôle pour les tests — configurer les pannes depuis le test
         self.decline_next:   bool = False
         self.decline_reason: str  = "insufficient_funds"
         self.fail_next:      bool = False
 
     async def charge(self, request: ChargeRequest) -> ChargeOutcome:
-        # Idempotency — same key, same result
+        # Idempotence — même clé, même résultat
         if request.idempotency_key in self._charges:
             return Ok(self._charges[request.idempotency_key])
 
-        # Configurable failure modes — tests set these
+        # Modes de panne configurables — les tests les activent
         if self.fail_next:
             self.fail_next = False
             return Err(PaymentServiceError("gateway unavailable"))
@@ -235,7 +235,7 @@ class FakePaymentGateway:
             self.decline_next = False
             return Err(PaymentDeclined(self.decline_reason))
 
-        # Preconditions — the fake enforces the same contract as the real thing
+        # Préconditions — le fake impose le même contrat que le réel
         if request.amount_cents <= 0:
             return Err(PaymentDeclined("amount must be positive"))
         if request.currency not in {"EUR", "USD", "GBP"}:
@@ -251,7 +251,7 @@ class FakePaymentGateway:
         return Ok(result)
 
     async def refund(self, request: RefundRequest) -> RefundOutcome:
-        # Idempotency
+        # Idempotence
         if request.idempotency_key in self._refunds:
             return Ok(self._refunds[request.idempotency_key])
 
@@ -259,7 +259,7 @@ class FakePaymentGateway:
             self.fail_next = False
             return Err(PaymentServiceError("gateway unavailable"))
 
-        # Find the original charge
+        # Retrouver le débit d'origine
         charge = next(
             (c for c in self._charges.values() if c.charge_id == request.charge_id),
             None,
@@ -279,15 +279,15 @@ class FakePaymentGateway:
         return Ok(result)
 ```
 
-**Key points to say:**
+**Points clés à dire :**
 
-- `decline_next` and `fail_next` are **test control points** — the test flips a flag, the next call behaves accordingly. No mock library, no patch, no magic.
-- Idempotency is implemented in the fake — same key, same result. The test verifies this behavior, which the real Stripe also guarantees.
-- The fake enforces the same preconditions as the real thing — `amount_cents > 0`, supported currencies. If your fake is too permissive, your tests won't catch contract violations.
+- `decline_next` et `fail_next` sont des **points de contrôle pour les tests** : le test lève un drapeau, l'appel suivant se comporte en conséquence. Ni bibliothèque de mock, ni patch, ni magie.
+- L'idempotence est implémentée dans le fake : même clé, même résultat. Le test vérifie ce comportement, que Stripe garantit aussi.
+- Le fake impose les mêmes préconditions que le réel : `amount_cents > 0`, devises supportées. Un fake trop permissif laisse passer les violations de contrat dans vos tests.
 
 ---
 
-## Part 6 — Tests Against the Fake: All Behavior Cases (60s)
+## Partie 6 — Tests contre le fake : tous les cas de comportement (60 s)
 
 ```python
 import pytest
@@ -300,7 +300,7 @@ def make_key() -> str:
 def gateway() -> FakePaymentGateway:
     return FakePaymentGateway()
 
-# Happy path
+# Chemin heureux
 async def test_charge_succeeds(gateway):
     result = await gateway.charge(ChargeRequest(
         amount_cents=1000, currency="EUR",
@@ -310,7 +310,7 @@ async def test_charge_succeeds(gateway):
     assert result.value.amount_cents == 1000
     assert result.value.status == "succeeded"
 
-# Unhappy path — card declined
+# Chemin malheureux — carte refusée
 async def test_charge_declined(gateway):
     gateway.decline_next = True
     gateway.decline_reason = "insufficient_funds"
@@ -322,7 +322,7 @@ async def test_charge_declined(gateway):
     assert isinstance(result.error, PaymentDeclined)
     assert result.error.reason == "insufficient_funds"
 
-# Unhappy path — gateway down
+# Chemin malheureux — passerelle indisponible
 async def test_charge_service_error(gateway):
     gateway.fail_next = True
     result = await gateway.charge(ChargeRequest(
@@ -332,7 +332,7 @@ async def test_charge_service_error(gateway):
     assert isinstance(result, Err)
     assert isinstance(result.error, PaymentServiceError)
 
-# Idempotency — same key, same result, called twice
+# Idempotence — même clé, même résultat, deux appels
 async def test_charge_idempotent(gateway):
     key = make_key()
     request = ChargeRequest(amount_cents=500, currency="USD",
@@ -341,9 +341,9 @@ async def test_charge_idempotent(gateway):
     second = await gateway.charge(request)
     assert isinstance(first, Ok)
     assert isinstance(second, Ok)
-    assert first.value.charge_id == second.value.charge_id  # same result
+    assert first.value.charge_id == second.value.charge_id  # même résultat
 
-# Refund happy path
+# Remboursement, chemin heureux
 async def test_refund_succeeds(gateway):
     key = make_key()
     charge = await gateway.charge(ChargeRequest(
@@ -354,13 +354,13 @@ async def test_refund_succeeds(gateway):
 
     refund = await gateway.refund(RefundRequest(
         charge_id=charge.value.charge_id,
-        amount_cents=500,                   # partial refund
+        amount_cents=500,                   # remboursement partiel
         idempotency_key=make_key(),
     ))
     assert isinstance(refund, Ok)
     assert refund.value.amount_cents == 500
 
-# Refund exceeds original — contract violation
+# Remboursement supérieur au débit — violation de contrat
 async def test_refund_exceeds_charge(gateway):
     key = make_key()
     charge = await gateway.charge(ChargeRequest(
@@ -371,25 +371,25 @@ async def test_refund_exceeds_charge(gateway):
 
     refund = await gateway.refund(RefundRequest(
         charge_id=charge.value.charge_id,
-        amount_cents=9999,                  # more than charged
+        amount_cents=9999,                  # plus que le montant débité
         idempotency_key=make_key(),
     ))
     assert isinstance(refund, Err)
     assert isinstance(refund.error, PaymentServiceError)
 ```
 
-**Say:** "These tests cover the full behavioral contract of the interface — not Stripe's implementation, not HTTP calls. They run in milliseconds, no network, no credentials. And in a moment, the same tests will run against real Stripe."
+**À dire :** « Ces tests couvrent tout le contrat de comportement de l'interface : l'implémentation de Stripe et les appels HTTP restent hors champ. Ils tournent en millisecondes, sans réseau ni identifiants. Dans un instant, les mêmes tests tourneront contre le vrai Stripe. »
 
 ---
 
-## Part 7 — The Real Stripe Adapter (60s)
+## Partie 7 — L'adaptateur Stripe réel (60 s)
 
 ```python
 import httpx
 import stamina
 from pydantic import BaseModel
 
-# Pydantic models for Stripe's actual response shapes
+# Modèles Pydantic pour les formes réelles des réponses de Stripe
 class StripeCharge(BaseModel):
     id:       str
     amount:   int
@@ -403,7 +403,7 @@ class StripeRefund(BaseModel):
     status:   str
 
 class StripePaymentGateway:
-    """Production adapter — wraps Stripe's API behind the PaymentGateway Protocol."""
+    """Adaptateur de production : enveloppe l'API de Stripe derrière le Protocol PaymentGateway."""
 
     def __init__(self, api_key: str):
         self._client = httpx.AsyncClient(
@@ -426,7 +426,7 @@ class StripePaymentGateway:
                 headers={"Idempotency-Key": request.idempotency_key},
             )
 
-            if response.status_code == 402:           # card declined
+            if response.status_code == 402:           # carte refusée
                 body = response.json()
                 return Err(PaymentDeclined(
                     body.get("error", {}).get("decline_code", "unknown")
@@ -477,11 +477,11 @@ class StripePaymentGateway:
         await self._client.aclose()
 ```
 
-**Say:** "Notice what's inside the adapter: timeouts, retry, response validation with pydantic, explicit `Result` types. Everything defensive stays here. The business logic never sees an httpx call. It just calls `charge()` and gets back a `ChargeOutcome`."
+**À dire :** « Regardez ce que contient l'adaptateur : timeouts, retry, validation des réponses avec pydantic, types `Result` explicites. Tout le défensif reste ici. La logique métier ne voit jamais un appel httpx. Elle appelle `charge()` et reçoit un `ChargeOutcome`. »
 
 ---
 
-## Part 8 — DI in Tests: Same Suite, Two Implementations (60s)
+## Partie 8 — Injection en test : même suite, deux implémentations (60 s)
 
 ```python
 # conftest.py
@@ -495,7 +495,7 @@ def pytest_addoption(parser):
         "--gateway",
         default="fake",
         choices=["fake", "stripe"],
-        help="Payment gateway implementation to test against",
+        help="Implémentation de la passerelle de paiement à tester",
     )
 
 @pytest.fixture
@@ -506,63 +506,63 @@ def gateway(request) -> PaymentGateway:
         api_key = os.environ["STRIPE_TEST_API_KEY"]
         gw = StripePaymentGateway(api_key=api_key)
         yield gw
-        # cleanup: cancel any test payment intents
+        # nettoyage : annuler les payment intents de test
         asyncio.run(gw.aclose())
     else:
         yield FakePaymentGateway()
 ```
 
 ```bash
-# Run against the fake — fast, no credentials, runs in CI always
+# Contre le fake : rapide, sans identifiants, toujours exécuté en CI
 pytest tests/payment/
 
-# Run against real Stripe test environment — slow, needs credentials, run on demand
+# Contre l'environnement de test de Stripe : lent, identifiants requis, à la demande
 pytest tests/payment/ --gateway=stripe
 ```
 
-**Say:** "The test file doesn't change. The fixture changes. The gateway flag decides which implementation flows in. Every test that passes against the fake is a claim about the contract — and running the same suite against Stripe verifies that the real adapter honors that contract."
+**À dire :** « Le fichier de tests ne change pas. La fixture change. Le drapeau `--gateway` décide quelle implémentation est injectée. Chaque test qui passe contre le fake est une affirmation sur le contrat, et lancer la même suite contre Stripe vérifie que l'adaptateur réel respecte ce contrat. »
 
-**The insight to land:**
+**L'idée à faire passer :**
 
-> "The fake is not a shortcut for testing. It *is* the test of the interface design. If the fake is hard to write, your interface is too wide. If the fake needs to know about HTTP, your abstraction is leaking. The fake is feedback."
+> « Le fake est le test de la conception de l'interface. S'il est difficile à écrire, votre interface est trop large. Si le fake doit connaître HTTP, votre abstraction fuit. Le fake est un retour d'information. »
 
 ---
 
-## Part 9 — Timeout, Retry, Idempotency: Where They Live (30s)
+## Partie 9 — Timeout, retry, idempotence : où ils vivent (30 s)
 
-**The answer is: inside the adapter. Always.**
+**La réponse : dans l'adaptateur. Toujours.**
 
 ```
-[ Business Logic ]   charge(request)          Result[ChargeResult, ...]
+[ Logique métier ]   charge(request)          Result[ChargeResult, ...]
         │            ──────────────────────►   ◄──────────────────────
         │
 [ StripePaymentGateway ]
-    - connect timeout: 2s        ← here
-    - read timeout: 10s          ← here
-    - retry on transient: 3x     ← here
-    - idempotency key: forwarded ← caller generates, adapter passes through
-    - response validation        ← here
-    - Result wrapping            ← here
+    - timeout de connexion : 2 s    ← ici
+    - timeout de lecture : 10 s     ← ici
+    - retry sur erreur transitoire : 3x ← ici
+    - clé d'idempotence : transmise ← l'appelant la génère, l'adaptateur la fait passer
+    - validation de la réponse      ← ici
+    - enveloppe Result              ← ici
 ```
 
-**Say:** "The business logic generates the idempotency key — it owns the operation identity. The adapter handles all transport concerns. This is the clean separation the adapter pattern gives you."
+**À dire :** « La logique métier génère la clé d'idempotence, car elle possède l'identité de l'opération. L'adaptateur gère tout le transport. C'est la séparation nette que donne le pattern adaptateur. »
 
 ---
 
-## Part 10 — Testing the Adapter Against a Malfunctioning Provider 
+## Partie 10 — Tester l'adaptateur contre un fournisseur défaillant
 
-> *"The fake tests the contract. But who tests the adapter — the translation layer between your interface and Stripe's reality? You need a way to simulate Stripe misbehaving, without Stripe."*
+> *« Le fake teste le contrat. Mais qui teste l'adaptateur, la couche de traduction entre votre interface et la réalité de Stripe ? Il faut un moyen de simuler un Stripe défaillant, sans Stripe. »*
 
-### The principle: inject the transport, not the client
+### Le principe : injecter le transport, pas le client
 
-The `StripePaymentGateway` depends on `httpx.AsyncClient`. That client is the seam for provider fault injection. Replace it with a controllable transport — no network, full control over what Stripe "returns".
+Le `StripePaymentGateway` dépend de `httpx.AsyncClient`. Ce client est la couture pour l'injection de pannes du fournisseur. On le remplace par un transport pilotable : pas de réseau, contrôle total sur ce que « renvoie » Stripe.
 
 ```python
-# httpx lets you inject a custom transport — no monkeypatching required
+# httpx permet d'injecter un transport personnalisé — pas de monkeypatching
 import httpx
 
 class FaultyStripeTransport(httpx.AsyncBaseTransport):
-    """Simulates a malfunctioning Stripe at the HTTP transport level."""
+    """Simule un Stripe défaillant au niveau du transport HTTP."""
 
     def __init__(self, behaviour: str):
         self.behaviour = behaviour  # "timeout" | "500" | "200_with_error" | "garbled"
@@ -574,16 +574,16 @@ class FaultyStripeTransport(httpx.AsyncBaseTransport):
             case "500":
                 return httpx.Response(500, json={"error": {"message": "internal error"}})
             case "200_with_error":
-                # The classic: HTTP 200, body says error
+                # Le classique : HTTP 200, le corps annonce une erreur
                 return httpx.Response(200, json={"status": "error", "code": "processing_error"})
             case "garbled":
-                # Response shape completely wrong — field renamed, missing
-                return httpx.Response(200, json={"charge_id": "ch_123"})  # not StripeCharge shape
+                # Forme de réponse complètement fausse : champ renommé, manquant
+                return httpx.Response(200, json={"charge_id": "ch_123"})  # pas la forme StripeCharge
             case _:
                 raise ValueError(f"unknown behaviour: {self.behaviour}")
 ```
 
-### The adapter accepts an injectable client
+### L'adaptateur accepte un client injectable
 
 ```python
 class StripePaymentGateway:
@@ -595,7 +595,7 @@ class StripePaymentGateway:
         )
 ```
 
-### Provider fault tests — short, explicit, exhaustive
+### Tests de pannes du fournisseur : courts, explicites, exhaustifs
 
 ```python
 def make_stripe(behaviour: str) -> StripePaymentGateway:
@@ -606,7 +606,7 @@ def make_stripe(behaviour: str) -> StripePaymentGateway:
     )
     return StripePaymentGateway(api_key="sk_test_fake", client=client)
 
-# Principle 1: timeout → PaymentServiceError, never an exception leak
+# Principe 1 : timeout → PaymentServiceError, aucune exception ne fuit
 async def test_adapter_timeout_returns_result():
     gw = make_stripe("timeout")
     result = await gw.charge(ChargeRequest(
@@ -617,7 +617,7 @@ async def test_adapter_timeout_returns_result():
     assert isinstance(result.error, PaymentServiceError)
     assert "timed out" in result.error.message
 
-# Principle 2: 500 → PaymentServiceError, not an unhandled HTTPStatusError
+# Principe 2 : 500 → PaymentServiceError, jamais un HTTPStatusError non géré
 async def test_adapter_500_returns_result():
     gw = make_stripe("500")
     result = await gw.charge(ChargeRequest(
@@ -627,16 +627,16 @@ async def test_adapter_500_returns_result():
     assert isinstance(result, Err)
     assert isinstance(result.error, PaymentServiceError)
 
-# Principle 3: 200 with error body → PaymentServiceError (not Ok)
+# Principe 3 : 200 avec un corps d'erreur → PaymentServiceError (jamais Ok)
 async def test_adapter_200_with_error_body():
     gw = make_stripe("200_with_error")
     result = await gw.charge(ChargeRequest(
         amount_cents=1000, currency="EUR",
         customer_id="cust_1", idempotency_key="key_1",
     ))
-    assert isinstance(result, Err)   # NOT Ok — the adapter must check the body
+    assert isinstance(result, Err)   # Ok serait faux : l'adaptateur doit vérifier le corps
 
-# Principle 4: garbled response → PaymentServiceError, never a ValidationError leak
+# Principe 4 : réponse corrompue → PaymentServiceError, aucune ValidationError ne fuit
 async def test_adapter_garbled_response():
     gw = make_stripe("garbled")
     result = await gw.charge(ChargeRequest(
@@ -645,66 +645,64 @@ async def test_adapter_garbled_response():
     ))
     assert isinstance(result, Err)
     assert isinstance(result.error, PaymentServiceError)
-    # A pydantic ValidationError must never escape the adapter boundary
+    # Une ValidationError de pydantic ne doit jamais franchir la frontière de l'adaptateur
 ```
 
-### The four principles these tests enforce
+### Les quatre principes que ces tests imposent
 
-**1. No exception must escape the adapter.** Timeouts, network errors, HTTP errors — all become `Err(PaymentServiceError(...))`. The business logic never catches httpx exceptions. It never should.
+**1. Aucune exception ne sort de l'adaptateur.** Timeouts, erreurs réseau, erreurs HTTP : tout devient `Err(PaymentServiceError(...))`. La logique métier n'attrape jamais d'exceptions httpx. Elle ne doit jamais avoir à le faire.
 
-**2. HTTP 200 is not success.** The adapter checks the body. A 200 with an error payload is `Err`, not `Ok`. This is the trap that production incidents are made of.
+**2. HTTP 200 ne signifie pas succès.** L'adaptateur vérifie le corps. Un 200 avec une charge utile d'erreur donne `Err`. Les incidents de production se nichent dans ce piège.
 
-**3. Schema violations are adapter failures.** If Stripe changes its response shape, pydantic raises `ValidationError`. The adapter catches it and returns `Err(PaymentServiceError(...))`. A `ValidationError` is never the caller's problem.
+**3. Une violation de schéma est un échec de l'adaptateur.** Si Stripe change la forme de sa réponse, pydantic lève `ValidationError`. L'adaptateur l'attrape et retourne `Err(PaymentServiceError(...))`. Une `ValidationError` ne regarde jamais l'appelant.
 
-**4. The transport is the seam for fault injection.** No monkeypatching, no `unittest.mock.patch`. Inject a transport, control the behaviour, test the adapter's response. Clean, explicit, no magic.
-
-
+**4. Le transport est la couture pour l'injection de pannes.** Ni monkeypatching ni `unittest.mock.patch`. On injecte un transport, on contrôle le comportement, on teste la réponse de l'adaptateur. Explicite et sans magie.
 
 ---
 
-## Circuit Breaker — One Line (15s)
+## Circuit breaker — en une phrase (15 s)
 
-> "For high-volume dependencies, add a circuit breaker around the adapter. `stamina` supports it. When Stripe is down, fail fast — don't retry 3 times × every request in your queue. Give the service room to recover."
-
----
-
-## Wrap (15s)
-
-> "Design the interface. Fake it. Test the contract. Plug in the real thing. Run the same tests. That's the full loop — and it applies to every external dependency you'll ever write."
+> « Pour les dépendances à fort volume, ajoutez un circuit breaker autour de l'adaptateur. Quand Stripe est en panne, échouez vite : inutile de rejouer 3 fois chaque requête de votre file. Laissez au service le temps de se rétablir. »
 
 ---
 
-## Key Takeaways
+## Conclusion (15 s)
 
-1. **Design the interface first** — your business logic should never know it's talking to Stripe.
-2. **`typing.Protocol`** is structural subtyping — any class that matches the shape *is* the interface.
-3. **Fakes over mocks** — a fake is a real implementation, lightweight and controllable. A mock tests the call, not the contract.
-4. **The fake is design feedback** — hard to write means the interface is too wide or leaking.
-5. **Same tests, two implementations** — pytest fixture DI runs the contract suite against fake and real.
-6. **All defensive machinery lives inside the adapter** — timeout, retry, validation, Result wrapping.
-7. **Caller generates the idempotency key** — adapter passes it through. Retry is safe.
+> « Concevoir l'interface. La simuler. Tester le contrat. Brancher le réel. Lancer les mêmes tests. C'est la boucle complète, et elle s'applique à chaque dépendance externe que vous écrirez. »
 
 ---
 
-## Notes for Slide Deck (Phase 2)
+## Points clés
 
-Key visuals for this module:
-- The adapter seam diagram: Business Logic → Protocol → [Fake | Stripe]
-- The test DI flow: same test file, `--gateway` flag, two fixture paths
-- Fake control points: `decline_next`, `fail_next` — show as a simple state toggle
-- Where defensive machinery lives: annotated adapter class diagram
+1. **Concevoir l'interface d'abord** : votre logique métier ne doit jamais savoir qu'elle parle à Stripe.
+2. **`typing.Protocol`** est du sous-typage structurel : toute classe qui a la bonne forme *est* l'interface.
+3. **Des fakes plutôt que des mocks** : un fake est une vraie implémentation, légère et pilotable. Un mock teste l'appel, le fake teste le contrat.
+4. **Le fake est un retour sur la conception** : difficile à écrire, il signale une interface trop large ou qui fuit.
+5. **Mêmes tests, deux implémentations** : l'injection par fixture pytest lance la suite de contrat sur le fake et sur le réel.
+6. **Toute la mécanique défensive vit dans l'adaptateur** : timeout, retry, validation, enveloppe Result.
+7. **L'appelant génère la clé d'idempotence**, l'adaptateur la transmet. Le retry est sûr.
 
 ---
 
-## References
+## Notes pour les slides (phase 2)
+
+Visuels clés de ce module :
+- Le schéma de la couture : logique métier → Protocol → [Fake | Stripe]
+- Le flux d'injection en test : même fichier de tests, drapeau `--gateway`, deux chemins de fixture
+- Points de contrôle du fake : `decline_next`, `fail_next`, à montrer comme un simple interrupteur d'état
+- Où vit la mécanique défensive : diagramme annoté de la classe adaptateur
+
+---
+
+## Références
 
 - `typing.Protocol` — PEP 544, Python 3.8+
-- `httpx` async docs — https://www.python-httpx.org
-- `stamina` library — https://stamina.hynek.me
-- Stripe test mode docs — https://stripe.com/docs/testing
-- *Growing Object-Oriented Software, Guided by Tests* — Freeman & Pryce (the fake vs mock argument, definitively)
-- *Working Effectively with Legacy Code* — Feathers (seam theory)
+- Documentation `httpx` async — https://www.python-httpx.org
+- Bibliothèque `stamina` — https://stamina.hynek.me
+- Documentation du mode test de Stripe — https://stripe.com/docs/testing
+- *Growing Object-Oriented Software, Guided by Tests* — Freeman & Pryce (l'argument fake contre mock, de façon définitive)
+- *Working Effectively with Legacy Code* — Feathers (théorie des coutures)
 
 ---
 
-*Module 04 of 6 · Defensive Programming from the Trenches*
+*Module 04 sur 6 · Defensive Programming from the Trenches*

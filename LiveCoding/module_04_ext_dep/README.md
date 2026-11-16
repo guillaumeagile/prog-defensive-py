@@ -1,6 +1,6 @@
 # Module 04 — Handling external dependencies
 
-Point d'entrée de l'instructeur. Le plan détaillé (accroche, war story, timing, parties 1 à 10) se trouve dans [`module_04_external_dependencies.md`](module_04_external_dependencies.md), en anglais pour l'instant.
+Point d'entrée de l'instructeur. Le plan détaillé (accroche, war story, timing, parties 1 à 10) se trouve dans [`module_04_external_dependencies.md`](module_04_external_dependencies.md).
 
 Source de pilotage : [`../../defensive_programming_live_coding_guide.md`](../../defensive_programming_live_coding_guide.md) (Module 04) et [`../../guideline.md`](../../guideline.md).
 
