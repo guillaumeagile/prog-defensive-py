@@ -1,50 +1,51 @@
 # Defensive Programming from the Trenches
-## Live Coding Session — Facilitator Guide
+## Session de live coding — Guide de l'animateur
 
-> **Format**: ~50 min · 6 modules · Python examples · Language-agnostic principles  
-> **Audience**: Developers  
-> **Goal**: Walk away writing defensive code by reflex, not deliberation
+> **Format** : ~50 min · 6 modules · exemples Python · principes indépendants du langage  
+> **Audience** : développeurs  
+> **Objectif** : repartir en écrivant du code défensif par réflexe, sans délibération
 
 ---
 
 ## A tale of two worldviews
 
-This guide deliberately shows both the **Pythonic idiom** and the **FP-consistent idiom** side by side, because you will encounter both in the wild and you need to be able to reason about the trade-offs.
+Ce guide montre volontairement côte à côte l'**idiome Pythonic** et l'**idiome FP-consistent**, car vous croiserez les deux dans la nature et vous devez savoir raisonner sur leurs compromis.
 
 | | Pythonic Python | FP-consistent Python |
 |---|---|---|
-| Expected failure | `raise ValueError` / return `None` | `return Failure(...)` |
-| Constructor validation | `__post_init__` raises | smart constructor returns `Result` |
-| Control flow | `try / except` at each call site | `bind` chains, one handler at the top |
-| Signature honesty | `def f(x) -> User` (lies — can raise) | `def f(x) -> Result[User, E]` (whole truth) |
+| Échec attendu | `raise ValueError` / retourner `None` | `return Failure(...)` |
+| Validation au constructeur | `__post_init__` lève une exception | smart constructor qui retourne un `Result` |
+| Control flow | `try / except` à chaque site d'appel | chaînes de `bind`, un seul handler en haut |
+| Honnêteté de la signature | `def f(x) -> User` (ment : peut lever) | `def f(x) -> Result[User, E]` (toute la vérité) |
 
-Neither is universally right. The Pythonic way is shorter and familiar to every Python dev. The FP way is more honest, more composable, and scales better when error paths get complex. Knowing *why* they diverge is what this guide is really teaching.
+Aucune des deux ne s'impose partout. La voie Pythonic est plus courte et familière à tout développeur Python. La voie FP est plus honnête, plus composable, et passe mieux à l'échelle quand les chemins d'erreur se complexifient. Comprendre *pourquoi* elles divergent est ce que ce guide enseigne vraiment.
 
-The rule used throughout:
-- **Domain / expected failures** (user error, missing record, age < 18) → `Result`
-- **Programming errors / true invariant violations** (corrupted DB row, unreachable branch) → `raise`
+La règle utilisée tout au long :
+- **Échecs du domaine / attendus** (erreur utilisateur, enregistrement manquant, âge < 18) → `Result`
+- **Erreurs de programmation / violations d'invariant réelles** (ligne de base corrompue, branche inatteignable) → `raise`
 
 ---
 
-## Before you start
+## Avant de commencer
 
-- Open a Python REPL or notebook alongside this guide
-- Have a "bad" snippet ready for the Module 06 audit exercise (see end of this doc)
-- Each module has a **❌ Bad code** → **✅ Better code** pair — type them live, don't paste
-- War stories marked **⚔** are your own to fill in; placeholders are provided
+- Ouvrir un REPL Python ou un notebook à côté de ce guide
+- Préparer un extrait « bad » pour l'exercice d'audit du Module 06 (voir la fin du document)
+- Chaque module contient une paire **❌ Bad code** → **✅ Better code** : la taper en direct, sans la coller
+- Les war stories marquées **⚔** sont à remplir avec vos propres histoires ; des emplacements sont prévus
+- Le code de démo du Module 01 se trouve dans `LiveCoding/module_01_never_trust_input/` (point d'entrée : `README.md`)
 
 ---
 
 ## Module 01 — Never trust input `~8 min`
 
-> *"The world is full of liars. Your function's callers are no exception."*
+> *« Le monde est plein de menteurs. Les appelants de votre fonction n'y font pas exception. »*
 
 ### Concept (2 min)
-Validation belongs at the **boundary** — the moment data enters your system (API endpoint, CLI arg, file read, queue message). Not three layers deep when something breaks silently.
+La validation appartient à la **boundary** : le moment où la donnée entre dans votre système (endpoint d'API, argument CLI, lecture de fichier, message de queue). Elle se fait là, et non trois couches plus bas quand quelque chose casse en silence.
 
 ### Live code (5 min)
 
-**❌ Bad — trusting the caller**
+**❌ Bad — faire confiance à l'appelant**
 ```python
 def create_user(data: dict):
     name = data["name"]
@@ -52,7 +53,7 @@ def create_user(data: dict):
     db.insert(name=name, age=age)
 ```
 
-**✅ Pythonic — validate at the boundary with Pydantic**
+**✅ Pythonic — valider à la boundary avec Pydantic**
 ```python
 from pydantic import BaseModel, Field, field_validator
 
@@ -72,38 +73,38 @@ def create_user(data: dict) -> None:
     db.insert(name=user.name, age=user.age)
 ```
 
-**Demo moment**: call `create_user({"name": "", "age": -5})` — show the error is clear and early.
+**Moment de démo** : appeler `create_user({"name": "", "age": -5})` et montrer que l'erreur est claire et précoce.
 
 ---
 
-> ### FP perspective: why `raise` in a constructor is a lie
+> ### Perspective FP : pourquoi un `raise` dans un constructeur est un mensonge
 >
-> **How `@field_validator` actually works**: when you call `UserInput(**data)`, Pydantic
-> generates an `__init__` that runs all validators in sequence. Your `@field_validator("name")`
-> is injected into that `__init__`. The `raise ValueError(...)` inside the validator is caught
-> by Pydantic and re-raised as a `ValidationError` — so from outside, the constructor either
-> returns a `UserInput` or blows up.
+> **Comment `@field_validator` fonctionne réellement** : quand vous appelez `UserInput(**data)`, Pydantic
+> génère un `__init__` qui exécute tous les validators en séquence. Votre `@field_validator("name")`
+> est injecté dans cet `__init__`. Le `raise ValueError(...)` du validator est attrapé
+> par Pydantic et relevé en `ValidationError` : vu de l'extérieur, le constructeur retourne un `UserInput`
+> ou explose.
 >
-> This connects to a broader principle — *constructors should be logic-free*:
+> Cela rejoint un principe plus large : *les constructeurs doivent rester sans logique* :
 >
-> | Tradition | How they say it |
+> | Tradition | Comment ils le disent |
 > |---|---|
-> | Misko Hevery (Google / Angular) | "Constructors do no work" |
-> | FP / type theory | "Constructors are total; parsing is separate" |
-> | Parse don't validate (Alexis King) | "Convert unstructured data into structured data exactly once, at the boundary" |
-> | DDD | "Use factory methods, not constructors, for domain object creation" |
+> | Misko Hevery (Google / Angular) | « Constructors do no work » |
+> | FP / théorie des types | « Constructors are total; parsing is separate » |
+> | Parse don't validate (Alexis King) | « Convert unstructured data into structured data exactly once, at the boundary » |
+> | DDD | « Use factory methods, not constructors, for domain object creation » |
 >
-> They all say the same thing: **construction and validation are two different operations**.
-> Conflating them into `__init__` creates a partial function — one defined only on valid inputs,
-> yet whose signature claims to work on all inputs.
+> Toutes disent la même chose : **construction et validation sont deux opérations différentes**.
+> Les fusionner dans `__init__` crée une partial function, définie seulement sur les entrées valides,
+> alors que sa signature prétend fonctionner sur toutes les entrées.
 >
-> The FP person looking at `UserInput(**data)` asks: *"What is the return type of this call?"*
-> The answer is `UserInput` — but that is only true if the input is valid.
-> If the input is invalid it raises. So the real type is `UserInput | raises ValidationError`.
-> Python's type system cannot express `| raises`, which means the signature **lies by omission**.
+> Face à `UserInput(**data)`, la personne FP demande : *« Quel est le type de retour de cet appel ? »*
+> La réponse est `UserInput`, mais seulement si l'entrée est valide.
+> Si l'entrée est invalide, l'appel lève. Le vrai type est donc `UserInput | raises ValidationError`.
+> Le système de types de Python ne sait pas exprimer `| raises`, donc la signature **ment par omission**.
 >
-> The FP-consistent fix is a **smart constructor** — a plain function, not a class constructor,
-> that makes the failure explicit in its return type:
+> La correction FP-consistent est un **smart constructor** : une fonction simple, sans constructeur de classe,
+> qui rend l'échec explicite dans son type de retour :
 >
 > ```python
 > from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -137,47 +138,47 @@ def create_user(data: dict) -> None:
 >     )
 > ```
 >
-> Now the signature of `parse_user` tells the whole truth: it either succeeds with a `UserInput`
-> or fails with a string message. No caller needs a `try/except`.
+> La signature de `parse_user` dit maintenant toute la vérité : elle réussit avec un `UserInput`
+> ou échoue avec un message. Aucun appelant n'a besoin de `try/except`.
 >
-> **Which to choose?**
-> The raising version is fine when `create_user` is a web endpoint and your framework already
-> catches `ValidationError` and turns it into a 422. The `Result` version is better when you
-> compose multiple parsing steps or when the failure needs to propagate through several layers
-> without sprinkling `try/except` everywhere.
+> **Laquelle choisir ?**
+> La version qui lève convient quand `create_user` est un endpoint web et que votre framework
+> attrape déjà `ValidationError` pour en faire un 422. La version `Result` est meilleure quand vous
+> composez plusieurs étapes de parsing, ou quand l'échec doit traverser plusieurs couches
+> sans semer des `try/except` partout.
 
 ---
 
-### Key points to say out loud
-- Whitelist what's valid, don't blacklist what's bad
-- Type hints document intent; Pydantic *enforces* it at runtime
-- Falsehoods programmers believe: names with spaces, ages as strings, "valid" email formats
-- If your framework handles `ValidationError` for you, the Pythonic version is perfectly fine — the smart constructor shines when you own the error path
+### Points clés à dire à voix haute
+- Whitelist ce qui est valide, ne blacklistez pas ce qui est mauvais
+- Les type hints documentent l'intention ; Pydantic l'*impose* à l'exécution
+- Falsehoods que croient les programmeurs : noms avec espaces, âges en chaînes, formats d'email « valides »
+- Si votre framework gère `ValidationError` pour vous, la version Pythonic convient parfaitement ; le smart constructor brille quand vous possédez le chemin d'erreur
 
-### ⚔ War story slot
-> *Your story here — e.g. a None slipping through unvalidated input that corrupted a record three hops later*
+### ⚔ Emplacement de la war story
+> *Votre histoire ici — par exemple un None passé à travers une entrée non validée et qui a corrompu un enregistrement trois sauts plus loin*
 
-### Exercise (1 min)
-> Add an `email` field to `UserInput` that rejects addresses without an `@` symbol.
-> Then write a `parse_user` smart constructor that returns `Result[UserInput, str]`.
+### Exercice (1 min)
+> Ajouter à `UserInput` un champ `email` qui rejette les adresses sans symbole `@`.
+> Écrire ensuite un smart constructor `parse_user` qui retourne `Result[UserInput, str]`.
 
 ---
 
 ## Module 02 — Fail fast, fail loud `~8 min`
 
-> *"If a failure is expected, encode it in the type."*
+> *« Si un échec est attendu, encodez-le dans le type. »*
 
 ### Concept (2 min)
-Silent failures are the most expensive bugs. Returning `None` and continuing with invalid state delays the explosion — and corrupts data along the way.
+Les échecs silencieux sont les bugs les plus coûteux. Retourner `None` et continuer avec un état invalide retarde l'explosion et corrompt des données en chemin.
 
-In this course, **fail loud** means:
+Dans ce cours, **fail loud** signifie :
 
-1. Expected failures are explicit values (`Result`), not hidden control flow.
-2. The error path is visible in signatures and impossible to ignore by accident.
+1. Les échecs attendus sont des valeurs explicites (`Result`), sans control flow caché.
+2. Le chemin d'erreur est visible dans les signatures et impossible à ignorer par accident.
 
 ### Live code (5 min)
 
-**❌ Bad — silent failure**
+**❌ Bad — échec silencieux**
 ```python
 def get_user(user_id: int):
     result = db.query(user_id)
@@ -189,7 +190,7 @@ def process_order(user_id: int):
     send_email(user.email)   # AttributeError: NoneType has no attribute 'email'
 ```
 
-**✅ Better — explicit failures + unrepresentable invalid state**
+**✅ Better — échecs explicites + état invalide non représentable**
 ```python
 from dataclasses import dataclass
 
@@ -232,28 +233,28 @@ def process_order(user_id: int) -> Result[None, GetUserError]:
     return get_active_user(user_id).map(process_order_for_active_user)
 ```
 
-**Demo moment**: call `process_order(999)` and `process_order(inactive_id)`.
-Show `Failure(UserNotFound(...))` / `Failure(UserInactive(...))` — explicit, typed, and impossible to ignore.
+**Moment de démo** : appeler `process_order(999)` et `process_order(inactive_id)`.
+Montrer `Failure(UserNotFound(...))` / `Failure(UserInactive(...))` : explicites, typés, impossibles à ignorer.
 
 ---
 
-> ### FP perspective: why the error ADT matters more than the Result wrapper
+> ### Perspective FP : pourquoi l'ADT d'erreurs compte plus que le wrapper Result
 >
-> The Pythonic alternative would be a custom exception hierarchy:
+> L'alternative Pythonic serait une hiérarchie d'exceptions personnalisées :
 > ```python
 > class UserNotFoundError(Exception): ...
 > class UserInactiveError(Exception): ...
 > ```
-> Both approaches name the failure cases. The difference is **where the compiler helps you**.
+> Les deux approches nomment les cas d'échec. La différence tient à **l'endroit où le compilateur vous aide**.
 >
-> With exceptions, a caller that forgets to handle `UserInactiveError` compiles and runs fine —
-> the error silently propagates up the stack until something catches `Exception`.
-> With `Result[ActiveUser, UserNotFound | UserInactive]`, a type checker (pyright/mypy) forces
-> the caller to inspect the result before using the value. You cannot accidentally treat a
-> `Failure(UserInactive(...))` as an `ActiveUser`.
+> Avec des exceptions, un appelant qui oublie de gérer `UserInactiveError` compile et s'exécute sans problème :
+> l'erreur remonte en silence dans la pile jusqu'à ce que quelque chose attrape `Exception`.
+> Avec `Result[ActiveUser, UserNotFound | UserInactive]`, un type checker (pyright/mypy) oblige
+> l'appelant à inspecter le résultat avant d'utiliser la valeur. Vous ne pouvez pas traiter par accident
+> un `Failure(UserInactive(...))` comme un `ActiveUser`.
 >
-> The FP term is **making illegal states unrepresentable at the call site**, not just at
-> the construction site.
+> Le terme FP est **making illegal states unrepresentable au site d'appel**, et pas seulement
+> au site de construction.
 
 ---
 
@@ -299,9 +300,9 @@ def signup(raw: dict[str, object]) -> Result[str, str]:
     )
 ```
 
-First `Failure` wins: later steps are skipped automatically, so the pipeline fails fast without hidden exceptions.
+Le premier `Failure` l'emporte : les étapes suivantes sont sautées automatiquement, donc le pipeline échoue vite sans exception cachée.
 
-### Loud failure rule — quick rule
+### Règle du loud failure — version courte
 ```python
 # Expected domain failures: return Result
 def reserve_stock(sku: str, qty: int) -> Result[None, OutOfStock]:
@@ -311,15 +312,15 @@ def reserve_stock(sku: str, qty: int) -> Result[None, OutOfStock]:
 raise RuntimeError("unreachable branch hit")
 ```
 
-### Bridge to Module 03
-In Module 03, we turn invariants into explicit contracts and then push them further with
-**illegal states unrepresentable** (type-level contracts).
+### Pont vers le Module 03
+Au Module 03, nous transformons les invariants en contrats explicites, puis nous allons plus loin avec
+**illegal states unrepresentable** (contrats au niveau des types).
 
-### ⚔ War story slot
-> *Your story here — e.g. a None that propagated silently into a financial calculation*
+### ⚔ Emplacement de la war story
+> *Votre histoire ici — par exemple un None propagé en silence dans un calcul financier*
 
-### Exercise (1 min)
-> Refactor this to return `Result[Config, ConfigError]` (no `None`, no exception for expected missing file):
+### Exercice (1 min)
+> Refactorer ceci pour retourner `Result[Config, ConfigError]` (ni `None`, ni exception pour un fichier manquant attendu) :
 > ```python
 > def parse_config(path: str):
 >     if not os.path.exists(path):
@@ -330,33 +331,33 @@ In Module 03, we turn invariants into explicit contracts and then push them furt
 
 ## Module 03 — Contracts & invariants `~8 min`
 
-> *"A contract says who guarantees what. Invariants are one part of that contract."*
+> *« Un contrat dit qui garantit quoi. Les invariants en sont une partie. »*
 
-### Aim (1 min)
-By the end of this module, the audience should be able to distinguish and enforce:
+### Objectif (1 min)
+À la fin de ce module, l'audience doit savoir distinguer et appliquer :
 
-- Function contracts (**preconditions + postconditions**)
-- Class invariants (**must always hold after construction and after each mutation**)
-- Type-level contracts (**illegal states unrepresentable**)
+- Les contrats de fonction (**preconditions + postconditions**)
+- Les invariants de classe (**doivent toujours tenir après la construction et après chaque mutation**)
+- Les contrats au niveau des types (**illegal states unrepresentable**)
 
 ### Concept (2 min)
-A **contract** has three parts:
+Un **contrat** comporte trois parties :
 
-1. **Preconditions** — what the caller must provide.
-2. **Postconditions** — what the function promises to return/guarantee.
-3. **Invariants** — what must always stay true for valid objects.
+1. **Preconditions** : ce que l'appelant doit fournir.
+2. **Postconditions** : ce que la fonction promet de retourner ou de garantir.
+3. **Invariants** : ce qui doit toujours rester vrai pour des objets valides.
 
-`Illegal states unrepresentable` is the strongest contract form: invalid combinations cannot be constructed.
+`Illegal states unrepresentable` est la forme de contrat la plus forte : les combinaisons invalides ne peuvent pas être construites.
 
-Rule of thumb for teaching and design:
+Règle pratique pour l'enseignement et la conception :
 
-1. If a rule is about **one value**, encode it as a **Value Object**.
-2. If a rule is about **relationships between fields**, enforce a **class invariant**.
-3. If a rule is about **lifecycle/states**, encode it in **types/state variants**.
+1. Si une règle porte sur **une seule valeur**, l'encoder dans un **Value Object**.
+2. Si une règle porte sur **les relations entre champs**, imposer un **invariant de classe**.
+3. Si une règle porte sur **le cycle de vie / les états**, l'encoder dans des **types / variantes d'états**.
 
 ### Live code (5 min)
 
-**Function contract = guard clauses + explicit postcondition**
+**Contrat de fonction = guard clauses + postcondition explicite**
 ```python
 from returns.result import Failure, Result, Success
 
@@ -369,14 +370,14 @@ def compute_discount(price: float, pct: float) -> Result[float, str]:
     return Success(price * (1 - pct / 100))
 ```
 
-- Preconditions: `price >= 0`, `0 <= pct <= 100`
-- Postcondition: caller always gets a `Result` (no hidden `None`)
+- Preconditions : `price >= 0`, `0 <= pct <= 100`
+- Postcondition : l'appelant reçoit toujours un `Result` (aucun `None` caché)
 
 ---
 
-**Value Object — two styles**
+**Value Object — deux styles**
 
-The Pythonic style uses `__post_init__` to raise:
+Le style Pythonic utilise `__post_init__` pour lever :
 
 ```python
 # Pythonic: raises on bad input
@@ -389,15 +390,15 @@ class PositiveAmount:
             raise ValueError("amount must be positive")
 ```
 
-> **FP perspective — why `__post_init__` raising is a partial function**
+> **Perspective FP — pourquoi un `__post_init__` qui lève est une partial function**
 >
-> `PositiveAmount(value=-1)` looks like a normal constructor call.
-> Its apparent return type is `PositiveAmount`. But for negative input it raises instead.
-> That makes it a **partial function**: defined only on a subset of its input domain,
-> yet the signature claims to be total.
+> `PositiveAmount(value=-1)` ressemble à un appel de constructeur normal.
+> Son type de retour apparent est `PositiveAmount`. Pour une entrée négative, l'appel lève pourtant.
+> C'est une **partial function** : définie sur une partie seulement de son domaine d'entrée,
+> alors que la signature se prétend totale.
 >
-> A total constructor either succeeds or returns an explicit failure — never raises for
-> domain validation. The FP-consistent version uses a smart constructor:
+> Un constructeur total réussit ou retourne un échec explicite, sans jamais lever pour de la validation
+> de domaine. La version FP-consistent utilise un smart constructor :
 >
 > ```python
 > # FP-consistent: smart constructor, total function
@@ -412,17 +413,18 @@ class PositiveAmount:
 >         return Success(cls(value=value))
 > ```
 >
-> Now every caller is forced by the type system to handle the failure case before touching
-> the `PositiveAmount`. No `try/except` needed anywhere — the failure is just a `Failure`.
+> Chaque appelant est maintenant forcé par le système de types de traiter le cas d'échec avant de toucher
+> au `PositiveAmount`. Aucun `try/except` nulle part : l'échec est simplement un `Failure`.
 >
-> **Which to choose?**
-> If `PositiveAmount` is only ever constructed from already-validated data (e.g., from your DB
-> schema), the raising version is fine — it guards against programming errors, not user errors.
-> Use the smart constructor when the value comes from user input or external data.
+> **Laquelle choisir ?**
+> Si `PositiveAmount` n'est jamais construit qu'à partir de données déjà validées (par exemple le schéma
+> de votre base), la version qui lève convient : elle protège contre les erreurs de programmation, pas contre
+> les erreurs utilisateur. Utilisez le smart constructor quand la valeur vient d'une entrée utilisateur ou de
+> données externes.
 
 ---
 
-**Class invariant pattern (for cross-field / state rules)**
+**Pattern d'invariant de classe (pour les règles entre champs / d'état)**
 
 ```python
 # Pythonic: mutable object, invariant checked after each transition
@@ -448,10 +450,10 @@ class BankAccount:
         self._ensure_invariant()
 ```
 
-> **FP perspective — make the failure explicit at the call site**
+> **Perspective FP — rendre l'échec explicite au site d'appel**
 >
-> `withdraw` raises for an expected domain event (insufficient funds).
-> The FP-consistent version returns `Result` so the caller sees the failure in the type:
+> `withdraw` lève pour un événement de domaine attendu (fonds insuffisants).
+> La version FP-consistent retourne un `Result`, pour que l'appelant voie l'échec dans le type :
 >
 > ```python
 > @dataclass(frozen=True)
@@ -476,21 +478,21 @@ class BankAccount:
 >         return Success(None)
 > ```
 >
-> The invariant `_balance >= 0` now holds **by construction** — `withdraw` simply refuses
-> to go below zero and tells the caller why, rather than raising after the fact.
-> No external `_ensure_invariant()` call needed because the mutation only happens on the
-> `Success` branch.
+> L'invariant `_balance >= 0` tient maintenant **par construction** : `withdraw` refuse simplement
+> de descendre sous zéro et dit pourquoi à l'appelant, au lieu de lever après coup.
+> Plus besoin d'un appel externe à `_ensure_invariant()`, car la mutation n'a lieu que sur la
+> branche `Success`.
 
 ---
 
-Pattern to say out loud:
-1. Check invariant after construction.
-2. Push single-value preconditions into Value Objects (`PositiveAmount`).
-3. Re-check invariant after each state transition.
-4. For **domain failures** (expected, recoverable), prefer `Result` over `raise`.
-5. Reserve `raise` for **programming errors** — conditions that should never happen if the code is correct.
+Pattern à dire à voix haute :
+1. Vérifier l'invariant après la construction.
+2. Pousser les preconditions sur une seule valeur dans des Value Objects (`PositiveAmount`).
+3. Revérifier l'invariant après chaque transition d'état.
+4. Pour les **échecs de domaine** (attendus, récupérables), préférer `Result` à `raise`.
+5. Réserver `raise` aux **erreurs de programmation** : les conditions qui ne devraient jamais se produire si le code est correct.
 
-**Illegal states unrepresentable (type-level contract)**
+**Illegal states unrepresentable (contrat au niveau des types)**
 ```python
 from dataclasses import dataclass
 
@@ -512,7 +514,7 @@ def confirm(order: DraftOrder) -> Result[ConfirmedOrder, str]:
 # `ship(order: ConfirmedOrder)` cannot be called with DraftOrder.
 ```
 
-**Immutability as contract amplifier**
+**L'immutabilité comme amplificateur de contrat**
 ```python
 @dataclass(frozen=True)
 class Config:
@@ -520,28 +522,28 @@ class Config:
     max_retries: int
 ```
 
-Once created, `Config` cannot drift into an invalid state through accidental mutation.
+Une fois créé, `Config` ne peut pas dériver vers un état invalide par mutation accidentelle.
 
-### Exercise (1 min)
-> Pick one function in your codebase and write down:
-> 1) one precondition,
-> 2) one postcondition,
-> 3) one invariant.
+### Exercice (1 min)
+> Choisir une fonction de votre codebase et noter :
+> 1) une precondition,
+> 2) une postcondition,
+> 3) un invariant.
 >
-> Then enforce each one explicitly in code — and decide for each: `raise` or `Result`?
+> Puis les imposer explicitement dans le code, et décider pour chacun : `raise` ou `Result` ?
 
 ---
 
 ## Module 04 — Handling external dependencies `~10 min`
 
-> *"Everything outside your process is hostile: APIs, DBs, the filesystem, time."*
+> *« Tout ce qui est hors de votre process est hostile : APIs, bases, filesystem, temps. »*
 
 ### Concept (2 min)
-External calls will: time out, return unexpected shapes, return 200 with an error inside, succeed on the first call and fail on retry, and run twice due to your retry logic. Design for all of this.
+Les appels externes vont : expirer (timeout), retourner des formes inattendues, retourner 200 avec une erreur dans le corps, réussir au premier appel et échouer au retry, et s'exécuter deux fois à cause de votre logique de retry. Concevez en tenant compte de tout cela.
 
 ### Live code (6 min)
 
-**Always timeout**
+**Toujours un timeout**
 ```python
 import httpx
 
@@ -555,7 +557,7 @@ response = httpx.get(
 )
 ```
 
-**Retry with exponential backoff + jitter**
+**Retry avec exponential backoff + jitter**
 ```python
 import time, random
 
@@ -570,7 +572,7 @@ def with_retry(fn, max_attempts=3, base_delay=0.5):
             time.sleep(delay)
 ```
 
-**Circuit breaker (minimal, 20 lines)**
+**Circuit breaker (minimal, 20 lignes)**
 ```python
 from datetime import datetime, timedelta
 
@@ -598,7 +600,7 @@ class CircuitBreaker:
             raise
 ```
 
-**Never trust the shape — validate the response too**
+**Ne jamais faire confiance à la forme — valider aussi la réponse**
 ```python
 # ❌ Assumes API behaves
 data = response.json()
@@ -612,11 +614,11 @@ if not user_id:
     raise ExternalServiceError(f"unexpected response shape: {data}")
 ```
 
-### ⚔ War story slot
-> *Your story here — e.g. the third-party API that returned HTTP 200 with `{"status": "error"}` in the body*
+### ⚔ Emplacement de la war story
+> *Votre histoire ici — par exemple l'API tierce qui retournait HTTP 200 avec `{"status": "error"}` dans le corps*
 
-### Exercise (1 min)
-> Add a timeout and a single retry to this call:
+### Exercice (1 min)
+> Ajouter un timeout et un seul retry à cet appel :
 > ```python
 > def fetch_exchange_rate(currency: str) -> float:
 >     return httpx.get(f"https://api.rates.io/{currency}").json()["rate"]
@@ -626,10 +628,10 @@ if not user_id:
 
 ## Module 05 — Concurrency traps `~8 min`
 
-> *"Concurrent code doesn't crash in tests. It crashes in production, at 2am."*
+> *« Le code concurrent ne plante pas dans les tests. Il plante en production, à 2 h du matin. »*
 
 ### Concept (2 min)
-Python's GIL protects against some race conditions in CPython — but not all, not in asyncio, and not across processes. The safest bet: design operations to be **idempotent** from the start.
+Le GIL de Python protège de certaines race conditions en CPython, mais pas de toutes, ni dans asyncio, ni entre processus. Le pari le plus sûr : concevoir dès le départ des opérations **idempotent**.
 
 ### Live code (4 min)
 
@@ -643,7 +645,7 @@ if os.path.exists(path):
         data = f.read()
 ```
 
-**Pythonic fix — ask forgiveness, not permission**
+**Correction Pythonic — demander pardon, pas la permission**
 ```python
 # Pythonic: exception used for control flow
 try:
@@ -653,14 +655,14 @@ except FileNotFoundError:
     data = None
 ```
 
-> **FP perspective — the Pythonic fix still hides the failure**
+> **Perspective FP — la correction Pythonic cache encore l'échec**
 >
-> The `try/except` solves the race but introduces a new problem: `data` is now
-> `str | None`, and a caller that forgets to check for `None` crashes later with an
-> `AttributeError` — the exact silent-failure pattern Module 02 warns against.
+> Le `try/except` règle la race mais introduit un nouveau problème : `data` vaut maintenant
+> `str | None`, et un appelant qui oublie de tester `None` plante plus tard avec un
+> `AttributeError`, exactement le pattern d'échec silencieux que le Module 02 déconseille.
 >
-> The FP-consistent fix keeps the "ask forgiveness" idea but makes the absence explicit
-> in the return type:
+> La correction FP-consistent garde l'idée de « demander pardon » mais rend l'absence explicite
+> dans le type de retour :
 >
 > ```python
 > from returns.result import Result, Success, Failure
@@ -674,18 +676,18 @@ except FileNotFoundError:
 >         return Failure(e)
 > ```
 >
-> Now the caller *cannot* use the content without first handling the missing-file case.
-> The `try/except` is still there — Python still needs it to detect the race —
-> but the failure is surfaced in the type rather than silently replaced with `None`.
+> L'appelant *ne peut pas* utiliser le contenu sans avoir traité le cas du fichier manquant.
+> Le `try/except` reste là (Python en a besoin pour détecter la race), mais l'échec apparaît
+> dans le type au lieu d'être remplacé en silence par `None`.
 >
-> **Which to choose?**
-> If `data = None` flows into a single `if data:` branch right below, the Pythonic version
-> is fine — it's readable and the scope is tiny. Use `Result` when the content will travel
-> through multiple layers before being consumed.
+> **Laquelle choisir ?**
+> Si `data = None` aboutit dans un seul `if data:` juste en dessous, la version Pythonic
+> convient : elle est lisible et le scope est minuscule. Utilisez `Result` quand le contenu
+> traverse plusieurs couches avant d'être consommé.
 
 ---
 
-**asyncio: the silent fire-and-forget trap**
+**asyncio : le piège du fire-and-forget silencieux**
 ```python
 import asyncio
 
@@ -702,7 +704,7 @@ async def safe_task(coro):
 task = asyncio.create_task(safe_task(send_email(user)))
 ```
 
-**Idempotency key pattern**
+**Pattern de l'idempotency key**
 ```python
 def process_payment(order_id: str, amount: float, idempotency_key: str):
     if db.payment_exists(idempotency_key):
@@ -713,15 +715,15 @@ def process_payment(order_id: str, amount: float, idempotency_key: str):
     return result
 ```
 
-### ⚔ War story slot
-> *Your story here — e.g. a double-charge caused by a network retry without idempotency keys*
+### ⚔ Emplacement de la war story
+> *Votre histoire ici — par exemple un double débit causé par un retry réseau sans idempotency key*
 
-### Quick mental model to share
-> *"If this function ran twice simultaneously with the same input, what breaks?"*  
-> If the answer is "nothing" — it's idempotent. Aim for that everywhere it matters.
+### Modèle mental rapide à partager
+> *« Si cette fonction s'exécutait deux fois simultanément avec la même entrée, qu'est-ce qui casserait ? »*  
+> Si la réponse est « rien », elle est idempotent. Visez cela partout où cela compte.
 
 ### Quiz (1 min)
-> What's wrong with this asyncio code?
+> Qu'est-ce qui cloche dans ce code asyncio ?
 > ```python
 > async def handler(request):
 >     asyncio.create_task(log_request(request))
@@ -732,9 +734,9 @@ def process_payment(order_id: str, amount: float, idempotency_key: str):
 
 ## Module 06 — Review & reflex `~8 min`
 
-> *"The goal: defensive patterns that feel automatic, not deliberate."*
+> *« Le but : des patterns défensifs qui deviennent automatiques, sans délibération. »*
 
-### Code review checklist (print this / share as a gist)
+### Checklist de code review (à imprimer / partager en gist)
 
 ```
 INPUTS
@@ -765,9 +767,9 @@ INVARIANTS
   [ ] Smart constructors used when invalid construction is a domain failure
 ```
 
-### Live audit exercise (5 min)
+### Exercice d'audit en live (5 min)
 
-**Paste this snippet — ask the audience to find the bugs**
+**Coller cet extrait et demander à l'audience de trouver les bugs**
 ```python
 def transfer_funds(from_id, to_id, amount):
     sender   = db.get_user(from_id)
@@ -783,15 +785,15 @@ def transfer_funds(from_id, to_id, amount):
     return True
 ```
 
-**Bugs to surface (let the audience find them first)**
-- `db.get_user()` might return `None` — no guard
-- No validation on `amount` (negative? zero? float precision?)
-- Race condition: balance check and debit are not atomic
-- `db.save(sender)` could succeed and `db.save(receiver)` could fail — no transaction
-- `notify_service.send()` is a fire-and-forget external call with no timeout/retry
-- Always returns `True` — even if nothing happened
+**Bugs à faire émerger (laisser l'audience les trouver d'abord)**
+- `db.get_user()` peut retourner `None`, sans guard
+- Aucune validation sur `amount` (négatif ? zéro ? précision des floats ?)
+- Race condition : la vérification du solde et le débit ne sont pas atomiques
+- `db.save(sender)` peut réussir et `db.save(receiver)` échouer : pas de transaction
+- `notify_service.send()` est un appel externe fire-and-forget sans timeout ni retry
+- Retourne toujours `True`, même si rien ne s'est passé
 
-**FP bonus question**: what would the signature of a correct `transfer_funds` look like?
+**Question bonus FP** : à quoi ressemblerait la signature d'un `transfer_funds` correct ?
 ```python
 @dataclass(frozen=True)
 class TransferFailed:
@@ -804,24 +806,24 @@ def transfer_funds(
 ) -> Result[None, TransferFailed]:
     ...
 ```
-The `PositiveAmount` type eliminates the negative/zero amount bug before the function body even runs.
-The `Result` return makes it impossible for callers to ignore a failed transfer.
+Le type `PositiveAmount` élimine le bug du montant négatif ou nul avant même l'exécution du corps de la fonction.
+Le retour `Result` rend impossible, pour les appelants, d'ignorer un transfert raté.
 
-### Closing 1-liner to leave on screen
-> *"Defensive code isn't pessimism. It's respect for the system's actual operating conditions."*
+### Phrase de clôture à laisser à l'écran
+> *« Le code défensif traduit du respect pour les conditions réelles d'exploitation du système, sans une once de pessimisme. »*
 
 ---
 
-## Appendix — Further reading
+## Annexe — Pour aller plus loin
 
-- *A Philosophy of Software Design* — John Ousterhout (Chapter 10: Define Errors Out Of Existence)
+- *A Philosophy of Software Design* — John Ousterhout (chapitre 10 : Define Errors Out Of Existence)
 - *Designing Distributed Systems* — Brendan Burns (idempotency, circuit breakers)
-- *Domain Modelling Made Functional* — Scott Wlaschin (the canonical reference for illegal states unrepresentable, smart constructors, and Result-based pipelines)
-- Python `returns` library — `Result`, `bind`, `flow` for Python
-- Python `tenacity` library — production-grade retry decorator
-- Python `pydantic` v2 docs — validation at the boundary
+- *Domain Modelling Made Functional* — Scott Wlaschin (la référence pour illegal states unrepresentable, smart constructors et pipelines basés sur Result)
+- Bibliothèque Python `returns` — `Result`, `bind`, `flow` pour Python
+- Bibliothèque Python `tenacity` — décorateur de retry de niveau production
+- Documentation Python `pydantic` v2 — validation à la boundary
 - Falsehoods Programmers Believe About Names — kalzumeus.com
 
 ---
 
-*Guide version 1.1 — expand war stories before the session*
+*Guide version 1.2 — enrichir les war stories avant la session*

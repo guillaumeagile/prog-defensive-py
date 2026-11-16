@@ -32,7 +32,7 @@ class _UserSchema(BaseModel):
         return v
 
 
-def parse_user_input(name: str, age: int, email: str) -> Result[UserInput, str]:
+def parse_user(name: str, age: int, email: str) -> Result[UserInput, str]:
     try:
         validated = _UserSchema(name=name, age=age, email=email)
         return Success(UserInput(name=validated.name, age=validated.age, email=validated.email))

@@ -1,30 +1,30 @@
-# Defensive & Pragmatic Python — Claude Code Guideline
+# Defensive & Pragmatic Python — Guideline pour Claude Code
 
-> **Purpose**: Live coding session reference for clean, type-safe, functionally-oriented
-> Python. Every piece of production code must be driven by tests. This document is the
-> contract Claude Code follows throughout the session.
+> **Objet** : référence de la session de live coding pour un Python propre, sûr côté types
+> et orienté fonctionnel. Tout code de production est piloté par les tests. Ce document est le
+> contrat que Claude Code suit pendant toute la session.
 
 ---
 
-## 0. Philosophy
+## 0. Philosophie
 
-Three principles govern every design decision in this session:
+Trois principes gouvernent chaque décision de conception de cette session :
 
-| Principle | What it means in practice |
+| Principe | Ce que cela signifie en pratique |
 |---|---|
-| **Parse, don't validate** | Transform untrusted data into rich types at the boundary. Never pass raw strings/dicts into domain logic. |
-| **Make illegal states unrepresentable** | Model your domain so invalid combinations cannot be constructed — not just caught at runtime. |
-| **Value Objects** | Wrap primitives in named types that carry their own invariants. `UserId` is not an `int`. |
+| **Parse, don't validate** | Transformer les données non fiables en types riches à la boundary. Ne jamais passer de strings/dicts bruts dans la logique du domaine. |
+| **Make illegal states unrepresentable** | Modéliser le domaine pour que les combinaisons invalides ne puissent pas être construites, au lieu de les attraper à l'exécution. |
+| **Value Objects** | Envelopper les primitives dans des types nommés qui portent leurs propres invariants. `UserId` n'est pas un `int`. |
 
-Python's runtime won't enforce these for you. The toolchain will.
+Le runtime de Python n'impose rien de tout cela. L'outillage s'en charge.
 
 ---
 
-## 1. Toolchain (non-negotiable)
+## 1. Toolchain (non négociable)
 
-### Type checking — `pyright` in strict mode
+### Type checking — `pyright` en mode strict
 
-Every project must have a `pyrightconfig.json` at the root:
+Chaque projet doit avoir un `pyrightconfig.json` à la racine :
 
 ```json
 {
@@ -35,9 +35,9 @@ Every project must have a `pyrightconfig.json` at the root:
 }
 ```
 
-Run before every commit. Treat type errors as build failures.
+À lancer avant chaque commit. Une erreur de type équivaut à un échec de build.
 
-### Testing — `pytest` + `hypothesis`
+### Tests — `pytest` + `hypothesis`
 
 ```toml
 # pyproject.toml
@@ -48,61 +48,61 @@ addopts = "--tb=short -q"
 max_examples = 200
 ```
 
-Two kinds of tests always coexist:
+Deux sortes de tests coexistent toujours :
 
-- **Example-based** (`pytest`): specific cases, edge cases, happy path, known failures.
-- **Property-based** (`hypothesis`): invariants that must hold for *any* valid input.
+- **Example-based** (`pytest`) : cas précis, cas limites, happy path, échecs connus.
+- **Property-based** (`hypothesis`) : invariants qui doivent tenir pour *toute* entrée valide.
 
-### Libraries
+### Bibliothèques
 
 ```bash
 pip install pydantic returns expression pyright pytest hypothesis
 ```
 
-| Library | Role |
+| Bibliothèque | Rôle |
 |---|---|
-| `pydantic` | Parsing and validation at system boundaries (HTTP, files, env) |
-| `returns` | `Result`, `Maybe`, railway-oriented programming inside domain logic |
-| `expression` | FP utilities: `pipe`, `Option`, tagged unions, immutable collections |
-| `pyright` | Static type enforcement |
+| `pydantic` | Parsing et validation aux boundaries du système (HTTP, fichiers, env) |
+| `returns` | `Result`, `Maybe`, railway-oriented programming dans la logique du domaine |
+| `expression` | Utilitaires FP : `pipe`, `Option`, tagged unions, collections immuables |
+| `pyright` | Vérification statique des types |
 
 ---
 
-## 2. TDD Rules
+## 2. Règles TDD
 
-### The only allowed workflow
+### Le seul workflow autorisé
 
 ```
 Install deps → Tests collect & run → Watch them fail (right reason) → Write minimum code to pass → Refactor
 ```
 
-No production code without a test first. No exceptions.
+Aucun code de production sans test préalable. Aucune exception.
 
-### Prerequisite: tests must be runnable before anything else
+### Prérequis : les tests doivent s'exécuter avant tout le reste
 
-Before writing any solution code, verify:
+Avant d'écrire du code de solution, vérifier :
 
-1. **Dependencies are installed** — `pytest`, `hypothesis`, `pydantic`, `returns`, `expression` must all be importable. Run `pip install` if needed.
-2. **Tests collect without import errors** — `pytest --collect-only` must succeed.
-3. **Tests fail for the right reason** — the failure must be `ModuleNotFoundError: No module named 'solution'` (or equivalent), not a tooling/environment error.
+1. **Les dépendances sont installées** : `pytest`, `hypothesis`, `pydantic`, `returns`, `expression` doivent toutes s'importer. Lancer `pip install` si besoin.
+2. **Les tests se collectent sans erreur d'import** : `pytest --collect-only` doit réussir.
+3. **Les tests échouent pour la bonne raison** : l'échec doit être `ModuleNotFoundError: No module named 'solution'` (ou équivalent), et non une erreur d'outillage ou d'environnement.
 
-Only once step 3 is confirmed is it valid to write `solution.py`.
+Ce n'est qu'une fois l'étape 3 confirmée qu'il est permis d'écrire `solution.py`.
 
-### Test file structure
+### Structure des fichiers de test
 
 ```
 exercises/
   exercise_01_value_objects/
-    README.md          ← what to implement and why
-    test_solution.py   ← tests written first, solution import commented out
-    solution.py        ← written after tests pass
+    README.md          ← quoi implémenter et pourquoi
+    test_solution.py   ← tests écrits d'abord, import de la solution commenté
+    solution.py        ← écrit une fois les tests passés
   exercise_02_parse_dont_validate/
     ...
 ```
 
-Each exercise is self-contained. Tests import from `solution.py` in the same directory.
+Chaque exercice est autonome. Les tests importent depuis `solution.py` dans le même dossier.
 
-### Naming convention
+### Convention de nommage
 
 ```python
 # Example-based
@@ -117,13 +117,13 @@ def test_<unit>_property_<invariant_name>(...):
 
 ---
 
-## 3. FP Concepts (explained for mixed audiences)
+## 3. Concepts FP (expliqués pour des audiences mixtes)
 
 ### 3.1 Value Objects
 
-> A **Value Object** is an object whose identity is defined by its value, not its
-> memory address. Two `Email("a@b.com")` instances are equal. It is immutable.
-> It validates itself on construction — or refuses to be constructed.
+> Un **Value Object** est un objet dont l'identité est définie par sa valeur, pas par son
+> adresse mémoire. Deux instances `Email("a@b.com")` sont égales. Il est immuable.
+> Il se valide lui-même à la construction, ou refuse d'être construit.
 
 ```python
 from dataclasses import dataclass
@@ -146,14 +146,14 @@ class Email:
         return Success(cls(raw))
 ```
 
-Key point: `Email.parse()` returns a `Result` — the caller is **forced** to handle
-the failure case. No silent `None`, no uncaught exception.
+Point clé : `Email.parse()` retourne un `Result`, donc l'appelant est **forcé** de traiter
+le cas d'échec. Aucun `None` silencieux, aucune exception non attrapée.
 
 ### 3.2 Parse, don't validate
 
-> **Validate**: take a value, return `True/False`. The value is still untyped after.
-> **Parse**: take a value, return a *richer type* or an explicit failure. After parsing,
-> the type itself is the proof of validity.
+> **Validate** : prendre une valeur, retourner `True/False`. La valeur reste non typée ensuite.
+> **Parse** : prendre une valeur, retourner un *type plus riche* ou un échec explicite. Après le parsing,
+> le type lui-même est la preuve de validité.
 
 ```python
 # ❌ Validate — caller can ignore the check
@@ -177,8 +177,8 @@ class Age:
 
 ### 3.3 Make illegal states unrepresentable
 
-> If your type system allows constructing a value that has no valid meaning in your
-> domain, you have a latent bug waiting for conditions to trigger it.
+> Si votre système de types permet de construire une valeur qui n'a aucun sens dans votre
+> domaine, vous avez un bug latent qui attend ses conditions de déclenchement.
 
 ```python
 # ❌ Allows nonsense: is_loading=True AND data=something
@@ -200,13 +200,13 @@ class FetchState:
     error: str = case()
 ```
 
-Pattern match on it — pyright will warn you if a branch is missing.
+Faire du pattern matching dessus : pyright signale une branche manquante.
 
 ### 3.4 Result & Railway-Oriented Programming
 
-> **Railway-oriented programming** (ROP): imagine two tracks — a success track and a
-> failure track. Once a computation derails onto the failure track, subsequent steps
-> are skipped. You compose functions that can fail without nested `try/except`.
+> **Railway-oriented programming** (ROP) : imaginer deux voies, une voie de succès et une voie
+> d'échec. Une fois qu'un calcul déraille sur la voie d'échec, les étapes suivantes
+> sont sautées. On compose des fonctions faillibles sans `try/except` imbriqués.
 
 ```python
 from returns.result import Result, Success, Failure
@@ -241,8 +241,8 @@ match result:
 
 ### 3.5 Option / Maybe
 
-> Use `Maybe` when a value may legitimately be absent — not as an error, just as
-> "nothing here". Replaces `None` returns with an explicit type you must unwrap.
+> Utiliser `Maybe` quand une valeur peut légitimement être absente, sans que ce soit une erreur : simplement
+> « rien ici ». Remplace les retours `None` par un type explicite qu'il faut déballer.
 
 ```python
 from returns.maybe import Maybe, Some, Nothing
@@ -262,8 +262,8 @@ match find_user(42):
 
 ### 3.6 Pipe
 
-> `pipe` passes a value through a sequence of functions left-to-right.
-> It replaces `f(g(h(x)))` with something readable.
+> `pipe` fait passer une valeur à travers une séquence de fonctions, de gauche à droite.
+> Il remplace `f(g(h(x)))` par quelque chose de lisible.
 
 ```python
 from expression import pipe
@@ -281,33 +281,33 @@ result = pipe(
 
 ---
 
-## 4. Exercise Structure
+## 4. Structure des exercices
 
-Each exercise follows this pattern:
+Chaque exercice suit ce schéma :
 
 ```
-README.md        — concept explained, what to implement
-test_solution.py — tests written BEFORE solution.py exists
-solution.py      — written during the session, TDD-driven
+README.md        — concept expliqué, quoi implémenter
+test_solution.py — tests écrits AVANT l'existence de solution.py
+solution.py      — écrit pendant la session, piloté par le TDD
 ```
 
-### Exercise list
+### Liste des exercices
 
-| # | Concept | Key tool |
+| # | Concept | Outil clé |
 |---|---|---|
-| 01 | Value Objects — wrap a primitive, enforce invariants | `dataclass(frozen=True)` |
-| 02 | Parse, don't validate — `Result` at the boundary | `returns` |
-| 03 | Illegal states — model a state machine | `expression @tagged_union` |
-| 04 | Railway — compose fallible functions | `returns flow + bind` |
-| 05 | Pydantic at the boundary — parse external JSON | `pydantic BaseModel` |
-| 06 | Property-based tests — find invariant violations | `hypothesis` |
-| 07 | Putting it together — a small domain end-to-end | all of the above |
+| 01 | Value Objects — envelopper une primitive, imposer des invariants | `dataclass(frozen=True)` |
+| 02 | Parse, don't validate — `Result` à la boundary | `returns` |
+| 03 | Illegal states — modéliser une state machine | `expression @tagged_union` |
+| 04 | Railway — composer des fonctions faillibles | `returns flow + bind` |
+| 05 | Pydantic à la boundary — parser du JSON externe | `pydantic BaseModel` |
+| 06 | Property-based tests — trouver les violations d'invariants | `hypothesis` |
+| 07 | Tout assembler — un petit domaine de bout en bout | tout ce qui précède |
 
 ---
 
-## 5. Exercise Templates
+## 5. Templates d'exercices
 
-### Exercise 01 — Value Objects
+### Exercice 01 — Value Objects
 
 **`test_solution.py`**
 
@@ -364,7 +364,7 @@ class TestAge:
 
 ---
 
-### Exercise 02 — Parse, don't validate
+### Exercice 02 — Parse, don't validate
 
 **`test_solution.py`**
 
@@ -410,7 +410,7 @@ class TestAgeParse:
 
 ---
 
-### Exercise 03 — Illegal States
+### Exercice 03 — Illegal States
 
 **`test_solution.py`**
 
@@ -452,7 +452,7 @@ class TestOrderStateMachine:
 
 ---
 
-### Exercise 04 — Railway-Oriented Programming
+### Exercice 04 — Railway-Oriented Programming
 
 **`test_solution.py`**
 
@@ -489,7 +489,7 @@ class TestRegisterUser:
 
 ---
 
-### Exercise 05 — Pydantic at the Boundary
+### Exercice 05 — Pydantic à la boundary
 
 **`test_solution.py`**
 
@@ -526,7 +526,7 @@ class TestUserPayload:
 
 ---
 
-### Exercise 06 — Property-Based Testing
+### Exercice 06 — Property-Based Testing
 
 **`test_solution.py`**
 
@@ -566,47 +566,47 @@ class TestProperties:
 
 ---
 
-### Exercise 07 — End-to-End Domain
+### Exercice 07 — Domaine de bout en bout
 
-**`README.md` (to write during session)**
+**`README.md` (à écrire pendant la session)**
 
-Design and TDD a minimal `OrderService` that:
+Concevoir et développer en TDD un `OrderService` minimal qui :
 
-- Accepts raw JSON input (parse with `pydantic`)
-- Creates `Order` value objects (parse, don't validate)
-- Runs through a state machine (illegal states unrepresentable)
-- Returns `Result[Order, str]` at every step (railway)
-- Has both example-based and property-based tests
+- Accepte du JSON brut en entrée (parsé avec `pydantic`)
+- Crée des Value Objects `Order` (parse, don't validate)
+- Passe par une state machine (illegal states unrepresentable)
+- Retourne `Result[Order, str]` à chaque étape (railway)
+- Possède des tests example-based et property-based
 
-This is the integration exercise — no new concepts, only composition.
-
----
-
-## 6. Code Style Rules for Claude Code
-
-These rules apply to **all generated code** in this session.
-
-```
-1. Every public function has a return type annotation.
-2. No bare `except:` — always catch specific types.
-3. No `Optional[X]` — use `X | None` (Python 3.10+ syntax).
-4. No mutable default arguments.
-5. No `dict` or `list` as domain types — wrap them in named types.
-6. `dataclass(frozen=True)` for all value objects.
-7. `Result` for operations that can fail. Never return `None` as an error signal.
-8. `Maybe/Option` for optional presence. Never return `None` as "not found".
-9. Pydantic models live at the boundary only — never passed into domain logic.
-10. Tests use `assert` directly — no `assertEqual`, no unittest style.
-11. No exceptions as control flow — callers must not need try/except to handle
-    expected failures. Wrap Pydantic's ValidationError internally and surface
-    failures as `Result[T, str]`. Exceptions are for truly unexpected errors only.
-    Goal: readable, maintainable code where the happy path and error path are
-    both explicit in the return type.
-```
+C'est l'exercice d'intégration : aucun nouveau concept, uniquement de la composition.
 
 ---
 
-## 7. Project Setup
+## 6. Règles de style de code pour Claude Code
+
+Ces règles s'appliquent à **tout code généré** pendant cette session.
+
+```
+1. Toute fonction publique a une annotation de type de retour.
+2. Aucun `except:` nu — toujours attraper des types précis.
+3. Aucun `Optional[X]` — utiliser `X | None` (syntaxe Python 3.10+).
+4. Aucun argument par défaut mutable.
+5. Aucun `dict` ni `list` comme types de domaine — les envelopper dans des types nommés.
+6. `dataclass(frozen=True)` pour tous les value objects.
+7. `Result` pour les opérations qui peuvent échouer. Ne jamais retourner `None` comme signal d'erreur.
+8. `Maybe/Option` pour la présence optionnelle. Ne jamais retourner `None` pour « non trouvé ».
+9. Les modèles Pydantic vivent uniquement à la boundary — ils ne sont jamais passés dans la logique du domaine.
+10. Les tests utilisent `assert` directement — pas de `assertEqual`, pas de style unittest.
+11. Aucune exception comme control flow — les appelants ne doivent pas avoir besoin de try/except
+    pour gérer les échecs attendus. Encapsuler la ValidationError de Pydantic en interne et
+    exposer les échecs en `Result[T, str]`. Les exceptions sont réservées aux erreurs vraiment
+    inattendues. But : un code lisible et maintenable où le happy path et le chemin d'erreur
+    sont tous deux explicites dans le type de retour.
+```
+
+---
+
+## 7. Mise en place du projet
 
 ```bash
 # Bootstrap a session exercise directory
@@ -633,7 +633,7 @@ pyright exercises/
 
 ---
 
-## 8. Quick Reference Card
+## 8. Aide-mémoire
 
 ```
 CONCEPT                  TOOL                    PATTERN

@@ -192,7 +192,9 @@ class HttpResponse:
     def __repr__(self) -> str:
         return f"HTTP {self.status} — {self.body}"
 
-
+# ---------------------------------------------------------------------------
+# HTTP endpoint : imperative and error prone
+# ---------------------------------------------------------------------------
 def register_endpoint(
     raw_json: dict[str, Any],
     service: UserRegistrationService,

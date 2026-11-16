@@ -6,7 +6,7 @@ import pytest
 from hypothesis import given, strategies as st
 from pydantic import ValidationError
 
-from solution_with_exceptions import UserInput
+from etape_2_pydantic_exception import UserInput
 
 
 class TestUserInputName:

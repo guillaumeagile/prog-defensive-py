@@ -5,7 +5,7 @@
     "solution_stronger_types.py"
   ],
   "exclude": [
-    "test_solution.py",
+    "test_solution_stronger_types.py",
     "TestParseUserInputPBT.py"
   ]
 }
