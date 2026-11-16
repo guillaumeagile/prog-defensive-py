@@ -1,107 +1,125 @@
 # Module 02 — Fail Fast, Fail Explicitly
-## Detailed Lesson Plan · ~9 minutes live · Defensive Programming from the Trenches
+## Plan détaillé · ~9 minutes live · Defensive Programming from the Trenches
 
-> *Be loud. Be clear. But don't be rude. Exceptions are rude — they interrupt everything, bypass the call stack, and leave the caller guessing. Explicit outcomes speak calmly and carry all the information.*
+> *Soyez bruyants. Soyez clairs. Mais restez polis. Les exceptions sont impolies : elles interrompent tout, contournent la pile d'appels et laissent l'appelant deviner. Les résultats explicites parlent calmement et portent toute l'information.*
+
+Point d'entrée : [`README.md`](README.md). Slides : [`presentation.md`](presentation.md). Source de pilotage : le Module 02 de `defensive_programming_live_coding_guide.md`.
 
 ---
 
-## Overview
+## Fichiers du live
+
+Tout ce que vous tapez ou montrez en direct se trouve dans `1_live/`.
+
+| Fichier | Slide | Contenu |
+|---|---|---|
+| `1_live/0_probleme_exceptions_invisibles.py` | « Le problème » | ❌ Exceptions pour des résultats attendus |
+| `1_live/ecriture_1_result_maison.py` | Écriture 1 | ✅ `Ok` / `Err` écrits à la main |
+| `1_live/ecriture_2_railway_bind.py` | Écriture 2 | ✅ Railway : `bind` enchaîne les étapes |
+| `1_live/ecriture_3_returns.py` | Écriture 3 | ✅ `returns` : `flow`, `bind`, `@safe` |
+| `1_live/test_ecriture_*.py` | | Tests de chaque écriture |
+
+Les approfondissements hors live sont dans `2_pour_aller_plus_loin/`.
+
+---
+
+## Vue d'ensemble
 
 | | |
 |---|---|
-| **Duration** | 9 minutes (live) + 5 min exercise if async |
-| **Core principle** | Fail fast — but speak in types, not interruptions. Expected failures are return values, not exceptions. |
-| **Python focus** | `Result[T, E]` hand-rolled → Railway Oriented Programming → `returns` library |
-| **Theory depth** | Medium — name the concepts, show the code, let mypy demonstrate |
-| **Audience takeaway** | I can encode failure in the type system — explicit, composable, impossible to ignore |
+| **Durée** | 9 minutes (live) + 5 min d'exercice si asynchrone |
+| **Principe central** | Fail fast, mais en types, sans interruption. Un échec attendu est une valeur de retour, pas une exception. |
+| **Focus Python** | `Result[T, E]` maison → Railway Oriented Programming → bibliothèque `returns` |
+| **Profondeur théorique** | Moyenne : nommer les concepts, montrer le code, laisser mypy démontrer |
+| **Ce que le public retient** | Je sais encoder l'échec dans le système de types : explicite, composable, impossible à ignorer |
 
 ---
 
-## Learning Objectives
+## Objectifs d'apprentissage
 
-1. Articulate why exceptions are the wrong tool for expected failure paths
-2. Build and read a minimal `Result[T, E]` type
-3. Chain operations Railway-style — no nested try/except pyramids
-4. Know when to reach for the `returns` library vs hand-rolling
+1. Expliquer pourquoi les exceptions sont le mauvais outil pour les échecs attendus
+2. Construire et lire un type `Result[T, E]` minimal
+3. Enchaîner les opérations façon Railway, sans pyramide de try/except
+4. Savoir quand utiliser la bibliothèque `returns` et quand écrire son propre `Result`
 
 ---
 
-## Facilitator Timing
+## Timing de l'instructeur
 
 ```
-00:00 — 01:00   Hook: exceptions are rude (60 sec)
-01:00 — 02:00   Concept: two levels of explicitness, name them (60 sec)
-02:00 — 03:30   The problem: exceptions as flow control (90 sec)
-03:30 — 05:30   Live code: hand-roll Result[T, E] (2 min)
-05:30 — 07:30   Live code: Railway — bind chain + diagram (2 min)
-07:30 — 08:30   Show: returns library + @safe (60 sec)
-08:30 — 09:00   Wrap: spectrum bar + direction of travel (30 sec)
+00:00 — 01:00   Accroche : les exceptions sont impolies (60 s)
+01:00 — 02:00   Concept : deux niveaux d'explicite, les nommer (60 s)
+02:00 — 03:30   Le problème : exceptions comme control flow (90 s)
+03:30 — 05:30   Live : écrire Result[T, E] à la main (2 min)
+05:30 — 07:30   Live : Railway, chaîne de bind + schéma (2 min)
+07:30 — 08:30   Montrer : bibliothèque returns + @safe (60 s)
+08:30 — 09:00   Conclusion : spectre + direction à suivre (30 s)
 ```
 
 ---
 
-## Part 1 — Hook (60 sec)
+## Partie 1 — Accroche (60 s)
 
-**Open with this:**
+**Ouvrir avec :**
 
-> "We want to fail fast. Absolutely. Detect problems early, surface them immediately, never let bad state propagate. But *how* we surface them matters."
+> « Nous voulons échouer vite. Absolument. Détecter les problèmes tôt, les faire remonter immédiatement, ne jamais laisser un mauvais état se propager. Mais *la façon* de les signaler compte. »
 
-**Pause. Then:**
+**Pause. Puis :**
 
-> "Exceptions are rude. They don't return a value — they *interrupt*. They bypass your entire call stack, unwind the stack frame, and force every caller upstream to either wrap everything in try/except or silently ignore the problem. And they're *invisible* in the function signature — there is no way to know `get_user()` can fail without reading its source or its docs. That's not explicit. That's a trap."
+> « Les exceptions sont impolies. Elles ne retournent pas de valeur : elles *interrompent*. Elles contournent toute votre pile d'appels, déroulent les frames, et obligent chaque appelant en amont à tout envelopper dans un try/except ou à ignorer le problème en silence. Et elles sont *invisibles* dans la signature : impossible de savoir que `get_user()` peut échouer sans lire son code ou sa doc. C'est un piège, pas de l'explicite. »
 
-**The reframe:**
+**Le recadrage :**
 
-> "Fail fast, yes. But fail *explicitly* — speak in types. An expected failure is a perfectly valid return value. It should be as visible in the signature as the success case. If 'user not found' is a normal outcome of a user lookup, it belongs in the return type, not in an exception."
+> « Fail fast, oui. Mais fail *explicitly* : parlez en types. Un échec attendu est une valeur de retour parfaitement valide. Il doit être aussi visible dans la signature que le cas de succès. Si "utilisateur introuvable" est une issue normale d'une recherche d'utilisateur, il appartient au type de retour, pas à une exception. »
 
-**Plant the seed:**
+**Planter la graine :**
 
-> "There's a programming style that makes this concrete — Railway Oriented Programming. We'll get there. Let's build up to it."
+> « Il existe un style de programmation qui rend cela concret : le Railway Oriented Programming. Nous y arrivons. Construisons pas à pas. »
 
-### ⚔ War story slot
+### ⚔ Emplacement de la war story
 
-> *Your story here. Suggested angle: a swallowed exception or bare `except: pass` that converted a real error into a silent wrong branch — not a crash, a wrong decision taken confidently. A charge processed twice. A record updated with stale data. The expensive failures are never the crashes — they're the quiet ones.*
-
----
-
-## Part 2 — Concept: Two Levels of Explicit (60 sec)
-
-**Say — no code here, just orient the audience:**
-
-> "There are two levels to this idea, and they're complementary."
-
-**Level 1 — Honest signatures:** the function return type tells you it can fail, and exactly what kind of failure. The caller *cannot* ignore it — it's in the type. This is `Result[T, E]`, and it's what we're building today.
-
-**Level 2 — Illegal states unrepresentable:** restructure your types so the wrong state *can't be constructed* at all. Not detected — impossible. That's sum types and sealed class hierarchies. We're covering that in Module 03.
-
-> "Today: Level 1. How to make failure paths as visible as the happy path."
+> *Votre histoire ici. Angle suggéré : une exception avalée ou un `except: pass` qui a transformé une vraie erreur en mauvaise branche silencieuse. Pas un crash, une décision erronée prise avec assurance. Un paiement traité deux fois. Un enregistrement mis à jour avec des données périmées. Les échecs coûteux ne sont jamais les crashs, ce sont les silencieux.*
 
 ---
 
-## Part 3 — The Problem: Exceptions as Flow Control (90 sec)
+## Partie 2 — Concept : deux niveaux d'explicite (60 s)
 
-> **Facilitator note**: type this live. The point lands when the audience sees how much *hidden knowledge* the caller is carrying.
+**Dire, sans code, juste pour orienter le public :**
+
+> « Cette idée a deux niveaux, complémentaires. »
+
+**Niveau 1 — Signatures honnêtes :** le type de retour dit que la fonction peut échouer, et quel genre d'échec. L'appelant *ne peut pas* l'ignorer, c'est dans le type. C'est `Result[T, E]`, ce que nous construisons aujourd'hui.
+
+**Niveau 2 — États illégaux impossibles :** restructurer les types pour que l'état invalide *ne puisse pas être construit*. Il n'est pas détecté, il est impossible. Ce sont les sum types et les hiérarchies de classes scellées. Nous les couvrons au Module 03.
+
+> « Aujourd'hui : le niveau 1. Rendre les chemins d'échec aussi visibles que le chemin de succès. »
+
+---
+
+## Partie 3 — Le problème : exceptions comme control flow (90 s)
+
+> **Note instructeur** : fichier `1_live/0_probleme_exceptions_invisibles.py`. À taper ou à montrer en direct. Le point porte quand le public voit la quantité de *connaissance cachée* que l'appelant transporte. Lancer le fichier : 4 utilisateurs, 4 messages.
 
 ```python
-# ❌ Exceptions for expected outcomes — rude and invisible
+# ❌ Exceptions pour des résultats attendus : impolies et invisibles
 def get_user(user_id: int) -> User:
     user = db.find(user_id)
     if not user:
         raise UserNotFoundError(user_id)
-        # "User not found" is a perfectly normal outcome.
-        # Nothing in the signature warns the caller.
-        # The return type says "User" — it lies.
+        # « Utilisateur introuvable » est une issue parfaitement normale.
+        # Rien dans la signature ne prévient l'appelant.
+        # Le type de retour dit "User" : il ment.
 
 def get_account(user: User) -> Account:
     account = db.get_account(user.id)
     if not account:
-        raise AccountNotFoundError(user.id)   # same lie
+        raise AccountNotFoundError(user.id)   # même mensonge
 
 def get_balance(account: Account) -> float:
     if account.suspended:
-        raise AccountSuspendedError()         # same lie
+        raise AccountSuspendedError()         # même mensonge
 
-# The caller pays the price for all three lies
+# L'appelant paie le prix de trois mensonges
 def process(user_id: int):
     try:
         user    = get_user(user_id)
@@ -111,21 +129,21 @@ def process(user_id: int):
     except UserNotFoundError: ...
     except AccountNotFoundError: ...
     except AccountSuspendedError: ...
-    # Every except clause = knowledge the type system didn't give you.
-    # Knowledge that has to be re-discovered by every caller, forever.
+    # Chaque clause except = une connaissance que le système de types n'a pas donnée.
+    # Une connaissance que chaque appelant doit redécouvrir, pour toujours.
 ```
 
-**Say:** "Count what the caller had to *know* without the type system telling them — three exception types, their names, when they're raised. That's implicit knowledge spread across the codebase, waiting to be forgotten by the next developer, or by you in six months."
+**Dire :** « Comptez ce que l'appelant devait *savoir* sans que le système de types le lui dise : trois types d'exception, leurs noms, les moments où elles sont levées. C'est de la connaissance implicite dispersée dans le code, que le prochain développeur oubliera, ou vous-même dans six mois. »
 
-**Then:** "Now let's fix the signatures."
+**Puis :** « Corrigeons les signatures. »
 
 ---
 
-## Part 4 — Live Code: Result[T, E] (2 min)
+## Partie 4 — Live : Result[T, E] (2 min)
 
-> **Facilitator note**: this is the heart of the module. Type it slowly. The goal is demystification — show that this is 30 lines, not magic.
+> **Note instructeur** : c'est le cœur du module. Fichier `1_live/ecriture_1_result_maison.py`. Taper lentement. Le but est de démystifier : montrer que ce sont 30 lignes, pas de la magie.
 
-### The type (60 sec)
+### Le type (60 s)
 
 ```python
 from dataclasses import dataclass
@@ -143,7 +161,7 @@ class Ok(Generic[T]):
         return Ok(fn(self.value))
 
     def bind(self, fn: Callable[[T], "Result[U, E]"]) -> "Result[U, E]":
-        return fn(self.value)        # success: keep going
+        return fn(self.value)        # succès : on continue
 
     def unwrap(self) -> T:
         return self.value
@@ -152,8 +170,8 @@ class Ok(Generic[T]):
 class Err(Generic[E]):
     error: E
 
-    def map(self, fn):   return self   # error: pass through, skip fn
-    def bind(self, fn):  return self   # error: pass through, skip fn
+    def map(self, fn):   return self   # erreur : on passe, on saute fn
+    def bind(self, fn):  return self   # erreur : on passe, on saute fn
 
     def unwrap(self):
         raise RuntimeError(f"unwrap() on Err: {self.error}")
@@ -161,9 +179,9 @@ class Err(Generic[E]):
 Result = Ok[T] | Err[E]
 ```
 
-**Say:** "That's it. `Ok` holds a success value. `Err` holds a failure value. Both are plain values — no interruption, no stack unwinding. And notice `bind` on `Err` — it just returns `self`. That's the key. Errors skip everything downstream automatically."
+**Dire :** « Voilà tout. `Ok` porte une valeur de succès. `Err` porte une valeur d'échec. Les deux sont des valeurs simples : pas d'interruption, pas de déroulement de pile. Et regardez `bind` sur `Err` : il renvoie `self`. C'est la clé. Les erreurs sautent automatiquement tout ce qui suit. »
 
-### Honest signatures (60 sec)
+### Signatures honnêtes (60 s)
 
 ```python
 @dataclass(frozen=True)
@@ -178,7 +196,7 @@ class AccountNotFound:
 class AccountSuspended:
     account_id: str
 
-# The signature is now honest — it tells you everything
+# La signature est maintenant honnête : elle dit tout
 def get_user(user_id: int) -> Result[User, UserNotFound]:
     user = db.find(user_id)
     return Ok(user) if user else Err(UserNotFound(user_id))
@@ -193,16 +211,18 @@ def get_balance(account: Account) -> Result[float, AccountSuspended]:
     return Ok(account.balance)
 ```
 
-**Say:** "No docs needed. No source-reading. The return type is the documentation. A new developer reads `Result[User, UserNotFound]` and knows immediately: this can succeed with a User, or fail with a UserNotFound. That's explicit."
+**Dire :** « Pas de doc à lire, pas de code source à fouiller. Le type de retour est la documentation. Un nouveau développeur lit `Result[User, UserNotFound]` et sait aussitôt : cela peut réussir avec un User, ou échouer avec un UserNotFound. C'est de l'explicite. »
 
 ---
 
-## Part 5 — Live Code: Railway (2 min)
+## Partie 5 — Live : Railway (2 min)
 
-### Without Railway — still verbose (30 sec)
+> **Note instructeur** : fichier `1_live/ecriture_2_railway_bind.py`. Les fonctions `get_balance_without_railway` puis `get_balance_railway` montrent l'avant et l'après.
+
+### Sans Railway : encore verbeux (30 s)
 
 ```python
-# ✅ Explicit, but tedious — checking at each step
+# ✅ Explicite, mais fastidieux : un test à chaque étape
 def process(user_id: int) -> Result[float, object]:
     user_result = get_user(user_id)
     if user_result.is_err():
@@ -215,12 +235,12 @@ def process(user_id: int) -> Result[float, object]:
     return get_balance(account_result.unwrap())
 ```
 
-**Say:** "Better than exceptions — but noisy. Every step is a check. The happy path is buried."
+**Dire :** « Mieux que les exceptions, mais bruyant. Chaque étape est un test. Le chemin de succès est enfoui. »
 
-### With Railway — bind chains it (60 sec)
+### Avec Railway : bind enchaîne (60 s)
 
 ```python
-# ✅✅ Railway — bind handles the routing
+# ✅✅ Railway : bind s'occupe du routage
 def process(user_id: int) -> Result[float, object]:
     return (
         get_user(user_id)
@@ -228,7 +248,7 @@ def process(user_id: int) -> Result[float, object]:
         .bind(get_balance)
     )
 
-# Usage — exhaustive match, no surprises
+# Usage : match exhaustif, aucune surprise
 match process(42):
     case Ok(value=balance):              print(f"Balance: {balance}")
     case Err(error=UserNotFound()):      print("User not found")
@@ -236,23 +256,25 @@ match process(42):
     case Err(error=AccountSuspended()):  print("Account suspended")
 ```
 
-### Draw this on the board (30 sec)
+### Dessiner au tableau (30 s)
 
 ```
 get_user ──Ok──► get_account ──Ok──► get_balance ──Ok──► float
             │                   │                   │
            Err                 Err                 Err
             │                   │                   │
-            └───────────────────┴───────────────────┴──► error (routes itself, politely)
+            └───────────────────┴───────────────────┴──► erreur (se route seule, poliment)
 ```
 
-**Say:** "Two tracks. The Ok track is your happy path — three words, flat, readable. The Err track is errors routing themselves around everything downstream without being told to. No try/except. No hidden control flow. That's Railway Oriented Programming — Scott Wlaschin coined it for F#, but the idea is universal."
+**Dire :** « Deux voies. La voie Ok est votre chemin de succès : trois mots, plat, lisible. La voie Err : les erreurs se routent seules autour de tout ce qui suit, sans qu'on leur dise. Pas de try/except. Pas de control flow caché. C'est le Railway Oriented Programming. Scott Wlaschin l'a inventé pour F#, mais l'idée est universelle. »
 
 ---
 
-## Part 6 — The `returns` Library (60 sec)
+## Partie 6 — La bibliothèque `returns` (60 s)
 
-> *"Everything we hand-rolled exists in production-grade form in `returns` by dry-python."*
+> **Note instructeur** : fichier `1_live/ecriture_3_returns.py`.
+
+> *« Tout ce que nous avons écrit à la main existe en version production dans `returns`, de dry-python. »*
 
 ```bash
 pip install returns
@@ -267,7 +289,7 @@ def get_user(user_id: int) -> Result[User, UserNotFound]:
     user = db.find(user_id)
     return Success(user) if user else Failure(UserNotFound(user_id))
 
-# flow() is the Railway chain — no .bind() calls needed
+# flow() est la chaîne Railway : plus besoin d'appels .bind()
 pipeline = flow(
     get_user,
     bind(get_account),
@@ -277,27 +299,27 @@ pipeline = flow(
 result = pipeline(42)
 ```
 
-**The killer feature — `@safe`:**
+**La fonctionnalité phare, `@safe` :**
 
 ```python
 from returns.result import safe
 
-# Wraps any exception-raising function into Result automatically
+# Enveloppe toute fonction qui lève une exception en Result, automatiquement
 @safe
 def parse_config(path: str) -> dict:
-    return json.loads(open(path).read())   # raises on bad JSON or missing file
+    return json.loads(open(path).read())   # lève sur JSON invalide ou fichier absent
 
 parse_config("config.json")    # → Success({...})
 parse_config("missing.json")   # → Failure(FileNotFoundError(...))
 ```
 
-**Say:** "`@safe` is your bridge between the exception-throwing world — third-party libraries, stdlib — and your Railway pipeline. Wrap it once at the boundary, speak Result everywhere inside."
+**Dire :** « `@safe` est votre pont entre le monde qui lève des exceptions (bibliothèques tierces, stdlib) et votre pipeline Railway. Enveloppez une fois à la boundary, parlez Result partout à l'intérieur. »
 
 ---
 
-## Sidebar: The Pythonic Middle Ground (facilitator note, don't demo live)
+## Sidebar : le compromis Pythonic (note instructeur, à ne pas démontrer en live)
 
-> *For teams where Result feels like too big a cultural step — a named tuple return is still better than exceptions as flow control:*
+> *Pour les équipes où Result représente un trop grand pas culturel, un retour en `NamedTuple` reste meilleur que des exceptions comme control flow :*
 
 ```python
 from typing import NamedTuple
@@ -312,18 +334,18 @@ def get_user(user_id: int) -> UserResult:
         else UserResult(user=None, error=f"user {user_id} not found")
 ```
 
-> *Honest signature, explicit error — just not chainable. Mention it as the stepping stone, not the destination.*
+> *Signature honnête, erreur explicite, mais pas chaînable. À présenter comme une marche intermédiaire, pas comme la destination.*
 
 ---
 
-## Exercise (solo or pair, 5 min)
+## Exercice (seul ou en binôme, 5 min)
 
-### Task
+### Énoncé
 
-A checkout pipeline. Three steps, each can fail explicitly.
+Un pipeline de checkout. Trois étapes, chacune peut échouer explicitement.
 
 ```python
-# Given these stubs — make them speak Result
+# Avec ces stubs, faites-les parler Result
 
 @dataclass(frozen=True)
 class Cart:
@@ -335,10 +357,10 @@ class ChargeReceipt:
     charge_id: str
     amount:    float
 
-# 1. Define typed error dataclasses for each failure case
-# 2. Implement each function returning Result
-# 3. Chain them with .bind()
-# 4. Handle the final result with match
+# 1. Définir une dataclass d'erreur typée pour chaque cas d'échec
+# 2. Implémenter chaque fonction avec un retour Result
+# 3. Les chaîner avec .bind()
+# 4. Traiter le résultat final avec match
 
 def validate_cart(cart_id: str) -> Result[Cart, ???]: ...
 def apply_discount(cart: Cart, code: str) -> Result[Cart, ???]: ...
@@ -385,57 +407,53 @@ match checkout("cart-123", "SAVE10", "tok_visa"):
     case Err(error=CardDeclined(r)):     print(f"Card declined: {r}")
 ```
 
-**Discussion points:**
-- The lambda in `.bind(lambda cart: apply_discount(cart, code))` — Python's main ergonomic rough edge vs F#. `returns` has `partial` helpers for this.
-- Where does this pipeline live in FastAPI/Django? Service layer. The view translates `Ok` → 200, `Err` → 4xx.
-- What goes in `except` now? Only genuinely exceptional things: DB connection failure, network timeout, unexpected `None` from a library bug.
+**Points de discussion :**
+- Le lambda dans `.bind(lambda cart: apply_discount(cart, code))` est l'aspérité ergonomique principale de Python face à F#. `returns` propose des helpers `partial` pour cela.
+- Où vit ce pipeline dans FastAPI/Django ? Dans la couche service. La vue traduit `Ok` → 200, `Err` → 4xx.
+- Que met-on dans `except` maintenant ? Seulement le vraiment exceptionnel : panne de connexion à la base, timeout réseau, `None` inattendu venant d'un bug de bibliothèque.
 
 ---
 
-## Key Takeaways
+## Points clés
 
-1. **Exceptions are for exceptional things** — infrastructure failures, bugs, the truly unexpected. Not expected business outcomes.
-2. **Honest signatures.** `Result[User, UserNotFound]` tells you everything before you run the code.
-3. **Railway Oriented Programming** — two tracks, `bind` does the routing. Happy path stays flat.
-4. **`@safe`** bridges the exception-throwing world into your Railway pipeline.
-5. **Illegal states** — that's Module 03.
+1. **Les exceptions servent à l'exceptionnel** : pannes d'infrastructure, bugs, imprévu. Les issues métier attendues n'en font pas partie.
+2. **Signatures honnêtes.** `Result[User, UserNotFound]` dit tout avant d'exécuter le code.
+3. **Railway Oriented Programming** : deux voies, `bind` fait le routage. Le chemin de succès reste plat.
+4. **`@safe`** ramène le monde des exceptions dans votre pipeline Railway.
+5. **États illégaux** : c'est le Module 03.
 
 ---
 
-## The Spectrum
+## Le spectre
 
 ```
-Exceptions          Named returns       Result[T, E]        Full ADTs
-(rude —             (honest but         (explicit,          (sealed types,
- invisible,          not chainable)      chainable,           nothing illegal)
- untyped)                               type-checked)
+Exceptions          Retours nommés      Result[T, E]        ADT complets
+(impolies :         (honnêtes,          (explicite,         (types scellés,
+ invisibles,         pas chaînables)     chaînable,          rien d'illégal)
+ non typées)                             vérifié par types)
 
    ◄──────────────────────────────────────────────────────────────►
-   most common                                           most explicit
-   in Python today                                      in Python today
+   le plus courant                                     le plus explicite
+   en Python aujourd'hui                              en Python aujourd'hui
 ```
 
-> *"You don't have to go all the way to the right on day one. But know the direction of travel — and understand what you're trading away when you stay on the left."*
+> *« Inutile d'aller tout à droite dès le premier jour. Mais connaissez la direction, et comprenez ce que vous sacrifiez en restant à gauche. »*
 
 ---
 
-## Notes for slide deck (Phase 2)
+## Pour aller plus loin (hors live)
 
-Key visuals for this module:
-- The two-track Railway diagram (Ok lane / Err lane)
-- Side-by-side: exceptions pyramid of try/except vs three-line `.bind()` chain
-- The spectrum bar
-- `@safe` as the bridge illustration (exception world → Result world)
+`2_pour_aller_plus_loin/1_value_objects_gardiens/` : un `Amount` qui garantit sa validité dès la construction, combiné au ROP. Prépare le Module 03.
 
 ---
 
-## References
+## Références
 
-- *Railway Oriented Programming* — Scott Wlaschin, fsharpforfun.com
-- `returns` library — https://returns.readthedocs.io
-- PEP 634 — Structural Pattern Matching (Python 3.10+)
-- *Domain Modeling Made Functional* — Scott Wlaschin (F# — ideas transfer directly)
+- *Railway Oriented Programming*, Scott Wlaschin, fsharpforfun.com
+- Bibliothèque `returns` : https://returns.readthedocs.io
+- PEP 634, Structural Pattern Matching (Python 3.10+)
+- *Domain Modeling Made Functional*, Scott Wlaschin (F#, les idées se transposent directement)
 
 ---
 
-*Module 02 of 6 · Defensive Programming from the Trenches*
+*Module 02 sur 6 · Defensive Programming from the Trenches*

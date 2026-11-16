@@ -1,5 +1,5 @@
-# Part 6 — The `returns` Library
-# Production-grade ROP with Success/Failure, flow(), and @safe decorator.
+# Écriture 3 — la bibliothèque `returns`.
+# ROP prêt pour la production : Success/Failure, flow(), @safe.
 # https://returns.readthedocs.io
 
 from dataclasses import dataclass

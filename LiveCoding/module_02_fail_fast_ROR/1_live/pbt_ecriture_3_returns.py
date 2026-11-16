@@ -2,7 +2,7 @@ from hypothesis import given, strategies as st
 
 from returns.result import Success, Failure
 
-from solution_returns_library import (
+from ecriture_3_returns import (
     UserNotFound,
     AccountNotFound,
     AccountSuspended,

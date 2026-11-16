@@ -1,6 +1,5 @@
-# Part 5 — Railway Oriented Programming (ROP)
-# Chain operations with bind — no nested if/else, no try/except pyramids.
-# Two tracks: Ok flows forward, Err bypasses everything downstream.
+# Écriture 1 — Result[T, E] écrit à la main.
+# Démystifier le type : 30 lignes, aucune magie.
 
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable
@@ -93,7 +92,6 @@ class FakeDB:
         self._users: dict[int, User] = {
             1: User(id=1, name="Alice"),
             2: User(id=2, name="Bob"),
-            3: User(id=3, name="Charlie"),
         }
         self._accounts: dict[str, Account] = {
             "acc-1": Account(id="acc-1", user_id=1, balance=100.0),
@@ -116,10 +114,6 @@ db = FakeDB()
 # Functions with honest signatures
 
 def get_user(user_id: int) -> Result[User, UserNotFound]:
-    """
-
-    :rtype: Result[User, UserNotFound]
-    """
     user = db.find_user(user_id)
     return Ok(user) if user else Err(UserNotFound(user_id))
 
@@ -135,58 +129,7 @@ def get_balance(account: Account) -> Result[float, AccountSuspended]:
     return Ok(account.balance)
 
 
-# Railway chains
-
-# WITHOUT Railway — verbose, checks at every step
-def get_balance_without_railway(user_id: int) -> Result[float, object]:
-    user_result = get_user(user_id)
-    if user_result.is_err():
-        return user_result
-
-    account_result = get_account(user_result.unwrap())
-    if account_result.is_err():
-        return account_result
-
-    return get_balance(account_result.unwrap())
-
-
-# WITH Railway — bind handles the routing
-def get_balance_railway(user_id: int) -> Result[float, object]:
-    return (
-        get_user(user_id)
-        .bind(get_account)
-        .bind(get_balance)
-    )
-
-
-# Extended pipeline with more steps
-
-@dataclass(frozen=True)
-class InsufficientFunds:
-    balance: float
-    requested: float
-
-
-def withdraw(amount: float) -> Callable[[float], Result[float, InsufficientFunds]]:
-    def _withdraw(balance: float) -> Result[float, InsufficientFunds]:
-        if balance < amount:
-            return Err(InsufficientFunds(balance=balance, requested=amount))
-        return Ok(balance - amount)
-    return _withdraw
-
-
-def process_withdrawal(user_id: int, amount: float) -> Result[float, object]:
-    return (
-        get_user(user_id)
-        .bind(get_account)
-        .bind(get_balance)
-        .bind(withdraw(amount))
-    )
-
-
-# Error rendering
-
-def render_error(error: object) -> str:
+def render_error(error: UserNotFound | AccountNotFound | AccountSuspended) -> str:
     match error:
         case UserNotFound(user_id=user_id):
             return f"User {user_id} not found"
@@ -194,16 +137,3 @@ def render_error(error: object) -> str:
             return f"No account for user {user_id}"
         case AccountSuspended(account_id=account_id):
             return f"Account {account_id} is suspended"
-        case InsufficientFunds(balance=balance, requested=requested):
-            return f"Balance {balance} is less than requested {requested}"
-        case _:
-            return f"Unknown error: {error}"
-
-
-# Railway diagram (visualized in code comments):
-#
-# get_user ──Ok──► get_account ──Ok──► get_balance ──Ok──► withdraw ──Ok──► new_balance
-#     │                │                  │                  │
-#    Err              Err                Err                Err
-#     │                │                  │                  │
-#     └────────────────┴──────────────────┴──────────────────┴────────────► error (routes itself)

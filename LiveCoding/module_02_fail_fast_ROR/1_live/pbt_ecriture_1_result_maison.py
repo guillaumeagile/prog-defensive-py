@@ -1,6 +1,6 @@
 from hypothesis import given, strategies as st
 
-from solution_hand_rolled_result import (
+from ecriture_1_result_maison import (
     Ok,
     Err,
     UserNotFound,

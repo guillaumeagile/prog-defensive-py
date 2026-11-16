@@ -33,7 +33,7 @@ La règle utilisée tout au long :
 - Chaque module contient une paire **❌ Bad code** → **✅ Better code** : la taper en direct, sans la coller
 - Les war stories marquées **⚔** sont à remplir avec vos propres histoires ; des emplacements sont prévus
 - Le code de démo du Module 01 se trouve dans `LiveCoding/module_01_never_trust_input/` (point d'entrée : `README.md`)
-
+- Le code de démo du Module 02 se trouve dans `LiveCoding/module_02_fail_fast_ROR/` (point d'entrée : `README.md`)
 ---
 
 ## Module 01 — Never trust input `~8 min`
