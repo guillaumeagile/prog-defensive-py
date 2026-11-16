@@ -8,6 +8,7 @@ Source de pilotage : [`../../defensive_programming_live_coding_guide.md`](../../
 
 1. Lire `module_03_contracts_invariants.md` (10 min de préparation).
 2. Ouvrir `1_live/` : c'est le seul dossier à taper en direct.
+3. Garder `presentation.md` ouvert dans Marp pour les diapositives.
 
 ## Déroulé live (~8 min)
 
@@ -24,7 +25,7 @@ Chaque écriture a son fichier de tests : `test_ecriture_1_invariant_classique.p
 
 ## Écart avec le guide
 
-Le guide (Module 03) présente les trois étapes sous forme de blocs de code et de perspectives FP. Ce dossier les rend exécutables et ajoute le point de départ `assert`. Le code utilise les annotations sans guillemets de Python 3.14 (PEP 649).
+Le guide (Module 03) présente les trois étapes sous forme de blocs de code et de perspectives FP. Ce dossier les rend exécutables et ajoute le point de départ `assert`. Le code utilise les annotations sans guillemets de Python 3.14 (PEP 649). Tout le dépôt cible Python 3.14.
 
 ## Pour aller plus loin (hors live)
 
@@ -48,3 +49,22 @@ Lancer le point de départ avec et sans optimisation :
 python LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py
 python -O LiveCoding/module_03_contracts_invariants/1_live/0_probleme_assert_evanoui.py
 ```
+
+## Vérification statique
+
+Configs dans `1_live/typage/`, en mode strict. Lancer depuis ce dossier :
+
+```bash
+cd LiveCoding/module_03_contracts_invariants/1_live/typage
+poetry run pyright --project pyright.ecriture_1.json
+poetry run mypy --config-file mypy.ecriture_1.ini
+```
+
+Remplacer `ecriture_1` par `ecriture_2` ou `ecriture_3`. Les trois écritures passent sans erreur.
+
+Deux règles `pyright` sont désactivées dans les configs :
+
+- `reportMatchNotExhaustive` : `returns` n'expose pas `Success | Failure` comme une union fermée.
+- `reportPrivateUsage` : `Balance` lit `amount._value`. La convention du guide autorise cette lecture dans le seul module qui définit les Value Objects.
+
+Le type d'erreur de `Result` est invariant : `PositiveAmount.create(x).bind(account.withdraw)` ne type pas, car `create` échoue avec `str` et `withdraw` avec `InsufficientFunds`. Les `__main__` enchaînent donc avec un `match` imbriqué.

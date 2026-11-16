@@ -59,7 +59,13 @@ class BankAccount:
 
 if __name__ == "__main__":
     account = BankAccount()
-    PositiveAmount.create(100.0).map(account.deposit)
-    PositiveAmount.create(30.0).bind(account.withdraw)
+    for value in (100.0, 30.0, 500.0):
+        match PositiveAmount.create(value):
+            case Success(amount):
+                if value == 100.0:
+                    account.deposit(amount)
+                else:
+                    print(f"retrait de {value} :", account.withdraw(amount))
+            case Failure(error):
+                print(error)
     print("solde :", account.balance)
-    print("retrait de 500 :", PositiveAmount.create(500.0).bind(account.withdraw))

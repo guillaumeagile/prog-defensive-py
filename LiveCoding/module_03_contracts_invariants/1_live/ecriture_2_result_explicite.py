@@ -48,10 +48,12 @@ if __name__ == "__main__":
             account.deposit(amount)
         case Failure(error):
             print(error)
-    match PositiveAmount.create(500.0).bind(account.withdraw):
-        case Success(_):
-            print("retrait accepté")
-        case Failure(InsufficientFunds(requested=requested, available=available)):
-            print(f"retrait refusé : {requested} demandé, {available} disponible")
+    match PositiveAmount.create(500.0):
+        case Success(amount):
+            match account.withdraw(amount):
+                case Success(_):
+                    print("retrait accepté")
+                case Failure(InsufficientFunds(requested=requested, available=available)):
+                    print(f"retrait refusé : {requested} demandé, {available} disponible")
         case Failure(error):
             print(error)

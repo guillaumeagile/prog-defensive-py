@@ -27,12 +27,8 @@ class TestRetraitExplicite:
         assert result == Failure(InsufficientFunds(requested=50.0, available=10.0))
         assert account.balance == 10.0
 
-    def test_composition_par_bind(self):
+    def test_montant_invalide_n_atteint_jamais_le_retrait(self):
         account = BankAccount()
         account.deposit(PositiveAmount(10.0))
-        assert PositiveAmount.create(50.0).bind(account.withdraw) == Failure(
-            InsufficientFunds(requested=50.0, available=10.0)
-        )
-        assert PositiveAmount.create(-1.0).bind(account.withdraw) == Failure(
-            "amount must be positive, got -1.0"
-        )
+        assert PositiveAmount.create(-1.0) == Failure("amount must be positive, got -1.0")
+        assert account.balance == 10.0

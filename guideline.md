@@ -29,7 +29,7 @@ Chaque projet doit avoir un `pyrightconfig.json` à la racine :
 ```json
 {
   "typeCheckingMode": "strict",
-  "pythonVersion": "3.12",
+  "pythonVersion": "3.14",
   "reportMissingImports": true,
   "reportUnusedVariable": "warning"
 }
@@ -620,7 +620,7 @@ pip install pyright
 cat > pyrightconfig.json << 'EOF'
 {
   "typeCheckingMode": "strict",
-  "pythonVersion": "3.12"
+  "pythonVersion": "3.14"
 }
 EOF
 

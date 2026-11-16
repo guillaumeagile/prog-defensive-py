@@ -1,0 +1,9 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.14",
+  "include": [
+    "../ecriture_2_result_explicite.py"
+  ],
+  "reportMatchNotExhaustive": "none",
+  "reportPrivateUsage": "none"
+}
