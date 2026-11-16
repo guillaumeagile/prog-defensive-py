@@ -415,7 +415,7 @@ class PositiveAmount:
 >     value: float  # private by convention — only create via PositiveAmount.create()
 >
 >     @classmethod
->     def create(cls, value: float) -> Result["PositiveAmount", str]:
+>     def create(cls, value: float) -> Result[PositiveAmount, str]:
 >         if value <= 0:
 >             return Failure(f"amount must be positive, got {value}")
 >         return Success(cls(value=value))
@@ -546,7 +546,7 @@ où la règle « jamais négatif » existe.
 @dataclass(frozen=True)
 class InsufficientFunds:
     requested: PositiveAmount   # des VO, plus de float
-    available: "Balance"
+    available: Balance
 
 
 @dataclass(frozen=True)
@@ -556,10 +556,10 @@ class Balance:
     def has_enough_funds(self, amount: PositiveAmount) -> bool:
         return amount._value <= self._value
 
-    def after_deposit(self, amount: PositiveAmount) -> "Balance":
+    def after_deposit(self, amount: PositiveAmount) -> Balance:
         return Balance(self._value + amount._value)  # total : un dépôt réussit toujours
 
-    def after_withdraw(self, amount: PositiveAmount) -> Result["Balance", InsufficientFunds]:
+    def after_withdraw(self, amount: PositiveAmount) -> Result[Balance, InsufficientFunds]:
         if not self.has_enough_funds(amount):
             return Failure(InsufficientFunds(requested=amount, available=self))
         return Success(Balance(self._value - amount._value))
@@ -592,7 +592,9 @@ Ce que l'audience doit voir :
 - Le critère de qualité : si on réécrit `Balance` avec des `Decimal` ou des centimes entiers,
   `BankAccount` ne change pas d'une ligne.
 
-Note Python : les noms des méthodes sont en `snake_case` (`has_enough_funds`, `after_withdraw`).
+Note Python : depuis Python 3.14 (PEP 649), les annotations sont évaluées paresseuses. `available: Balance`
+fonctionne donc avant la définition de `Balance`, sans guillemets ni `from __future__ import annotations`.
+Les noms des méthodes sont en `snake_case` (`has_enough_funds`, `after_withdraw`).
 L'objet `BankAccount` reste mutable (il remplace son `Balance`) ; seules les valeurs sont immuables.
 Une version entièrement pure retournerait un nouveau `BankAccount` à chaque opération.
 
