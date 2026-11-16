@@ -77,75 +77,75 @@ def create_user(data: dict) -> None:
 
 ---
 
-> ### Perspective FP : pourquoi un `raise` dans un constructeur est un mensonge
->
-> **Comment `@field_validator` fonctionne réellement** : quand vous appelez `UserInput(**data)`, Pydantic
-> génère un `__init__` qui exécute tous les validators en séquence. Votre `@field_validator("name")`
-> est injecté dans cet `__init__`. Le `raise ValueError(...)` du validator est attrapé
-> par Pydantic et relevé en `ValidationError` : vu de l'extérieur, le constructeur retourne un `UserInput`
-> ou explose.
->
-> Cela rejoint un principe plus large : *les constructeurs doivent rester sans logique* :
->
-> | Tradition | Comment ils le disent |
-> |---|---|
-> | Misko Hevery (Google / Angular) | « Constructors do no work » |
-> | FP / théorie des types | « Constructors are total; parsing is separate » |
-> | Parse don't validate (Alexis King) | « Convert unstructured data into structured data exactly once, at the boundary » |
-> | DDD | « Use factory methods, not constructors, for domain object creation » |
->
-> Toutes disent la même chose : **construction et validation sont deux opérations différentes**.
-> Les fusionner dans `__init__` crée une partial function, définie seulement sur les entrées valides,
-> alors que sa signature prétend fonctionner sur toutes les entrées.
->
-> Face à `UserInput(**data)`, la personne FP demande : *« Quel est le type de retour de cet appel ? »*
-> La réponse est `UserInput`, mais seulement si l'entrée est valide.
-> Si l'entrée est invalide, l'appel lève. Le vrai type est donc `UserInput | raises ValidationError`.
-> Le système de types de Python ne sait pas exprimer `| raises`, donc la signature **ment par omission**.
->
-> La correction FP-consistent est un **smart constructor** : une fonction simple, sans constructeur de classe,
-> qui rend l'échec explicite dans son type de retour :
->
-> ```python
-> from pydantic import BaseModel, Field, ValidationError, field_validator
-> from returns.result import Result, Success, Failure
->
->
-> class UserInput(BaseModel):
->     name: str = Field(..., min_length=1, max_length=100)
->     age:  int  = Field(..., ge=0, le=150)
->
->     @field_validator("name")
->     @classmethod
->     def no_empty_name(cls, v: str) -> str:
->         if not v.strip():
->             raise ValueError("name cannot be blank")
->         return v.strip()
->
->
-> def parse_user(data: dict) -> Result[UserInput, str]:
->     """Smart constructor: the only way to get a UserInput."""
->     try:
->         return Success(UserInput(**data))
->     except ValidationError as e:
->         first = e.errors()[0]
->         return Failure(f"{first['loc'][0]}: {first['msg']}")
->
->
-> def create_user(data: dict) -> Result[None, str]:
->     return parse_user(data).map(
->         lambda user: db.insert(name=user.name, age=user.age)
->     )
-> ```
->
-> La signature de `parse_user` dit maintenant toute la vérité : elle réussit avec un `UserInput`
-> ou échoue avec un message. Aucun appelant n'a besoin de `try/except`.
->
-> **Laquelle choisir ?**
-> La version qui lève convient quand `create_user` est un endpoint web et que votre framework
-> attrape déjà `ValidationError` pour en faire un 422. La version `Result` est meilleure quand vous
-> composez plusieurs étapes de parsing, ou quand l'échec doit traverser plusieurs couches
-> sans semer des `try/except` partout.
+### Perspective FP : pourquoi un `raise` dans un constructeur est un mensonge
+
+**Comment `@field_validator` fonctionne réellement** : quand vous appelez `UserInput(**data)`, Pydantic
+génère un `__init__` qui exécute tous les validators en séquence. Votre `@field_validator("name")`
+est injecté dans cet `__init__`. Le `raise ValueError(...)` du validator est attrapé
+par Pydantic et relevé en `ValidationError` : vu de l'extérieur, le constructeur retourne un `UserInput`
+ou explose.
+
+Cela rejoint un principe plus large : *les constructeurs doivent rester sans logique* :
+
+| Tradition | Comment ils le disent |
+|---|---|
+| Misko Hevery (Google / Angular) | « Constructors do no work » |
+| FP / théorie des types | « Constructors are total; parsing is separate » |
+| Parse don't validate (Alexis King) | « Convert unstructured data into structured data exactly once, at the boundary » |
+| DDD | « Use factory methods, not constructors, for domain object creation » |
+
+Toutes disent la même chose : **construction et validation sont deux opérations différentes**.
+Les fusionner dans `__init__` crée une partial function, définie seulement sur les entrées valides,
+alors que sa signature prétend fonctionner sur toutes les entrées.
+
+Face à `UserInput(**data)`, la personne FP demande : *« Quel est le type de retour de cet appel ? »*
+La réponse est `UserInput`, mais seulement si l'entrée est valide.
+Si l'entrée est invalide, l'appel lève. Le vrai type est donc `UserInput | raises ValidationError`.
+Le système de types de Python ne sait pas exprimer `| raises`, donc la signature **ment par omission**.
+
+La correction FP-consistent est un **smart constructor** : une fonction simple, sans constructeur de classe,
+qui rend l'échec explicite dans son type de retour :
+
+```python
+from pydantic import BaseModel, Field, ValidationError, field_validator
+from returns.result import Result, Success, Failure
+
+
+class UserInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    age:  int  = Field(..., ge=0, le=150)
+
+    @field_validator("name")
+    @classmethod
+    def no_empty_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("name cannot be blank")
+        return v.strip()
+
+
+def parse_user(data: dict) -> Result[UserInput, str]:
+    """Smart constructor: the only way to get a UserInput."""
+    try:
+        return Success(UserInput(**data))
+    except ValidationError as e:
+        first = e.errors()[0]
+        return Failure(f"{first['loc'][0]}: {first['msg']}")
+
+
+def create_user(data: dict) -> Result[None, str]:
+    return parse_user(data).map(
+        lambda user: db.insert(name=user.name, age=user.age)
+    )
+```
+
+La signature de `parse_user` dit maintenant toute la vérité : elle réussit avec un `UserInput`
+ou échoue avec un message. Aucun appelant n'a besoin de `try/except`.
+
+**Laquelle choisir ?**
+La version qui lève convient quand `create_user` est un endpoint web et que votre framework
+attrape déjà `ValidationError` pour en faire un 422. La version `Result` est meilleure quand vous
+composez plusieurs étapes de parsing, ou quand l'échec doit traverser plusieurs couches
+sans semer des `try/except` partout.
 
 ---
 
