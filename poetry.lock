@@ -415,14 +415,14 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests
 
 [[package]]
 name = "returns"
-version = "0.27.0"
+version = "0.30.0"
 description = "Make your functions return something meaningful, typed, and safe!"
 optional = false
 python-versions = "<4.0,>=3.11"
 groups = ["main"]
 files = [
-    {file = "returns-0.27.0-py3-none-any.whl", hash = "sha256:a84f243b9a17e9b96c16b709f5cca819550c38a2fc4db725ee2539354956af12"},
-    {file = "returns-0.27.0.tar.gz", hash = "sha256:f70a452dd81e6d024c97523683aba85076b15e00874e723afb23bcf3aa4ecea2"},
+    {file = "returns-0.30.0-py3-none-any.whl", hash = "sha256:bc1ab0ec51391a36545acbff43f3abb916d3d3625ec17f93605e15ee60efa687"},
+    {file = "returns-0.30.0.tar.gz", hash = "sha256:126513ad16b6eb7d804ad289340b3b44f79bfb33496e641cd1b8b1766eb02254"},
 ]
 
 [package.dependencies]
@@ -430,7 +430,7 @@ typing-extensions = ">=4.0,<5.0"
 
 [package.extras]
 check-laws = ["hypothesis (>=6.151,<7.0)", "pytest (>=8,<10)"]
-compatible-mypy = ["mypy (>=1.19,<1.21)"]
+compatible-mypy = ["mypy (>=1.19,<2.5)"]
 
 [[package]]
 name = "sortedcontainers"
@@ -474,4 +474,4 @@ typing-extensions = ">=4.12.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<3.15"
-content-hash = "5676cc4ca8a09495c1b73f04999c36b9ed949c982056058fadf895255509f3e0"
+content-hash = "41b6660dc95664861cc53630c15bd153141ed577c2a5d3a558a6e25386b1e8c9"

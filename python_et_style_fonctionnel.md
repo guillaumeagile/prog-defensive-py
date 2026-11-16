@@ -38,7 +38,7 @@ Même code, mode strict, Python 3.14. Module 03, étape 2 : `PositiveAmount.crea
 
 | Bibliothèque | mypy strict | pyright strict |
 |---|---|---|
-| `returns` 0.27 | erreur `arg-type` sur le `bind` | erreur sur le `bind`, `match` non exhaustif |
+| `returns` 0.27 et 0.30 | erreur `arg-type` sur le `bind` | erreur sur le `bind`, `match` non exhaustif |
 | `Expression` 6.0.1 | aucune erreur | aucune erreur |
 
 Cause pour `returns` : `Result[T, E]` y est une classe générique dont le type d'erreur est invariant, et la bibliothèque émule les types d'ordre supérieur (`KindN`) avec un plugin `mypy`. `pyright` n'exécute pas ce plugin. Pour que les deux vérificateurs acceptent le code, il faut déclarer un type d'erreur commun (`type AccountError = str | InsufficientFunds`) dans toutes les fonctions chaînées.
@@ -68,7 +68,17 @@ Données PyPI au 2026-11-16.
 | `result` | 0.17.0 | ≥ 3.8 | 2024-06-02 | style Rust, pas de classifier 3.14 |
 | `PyMonad` | 2.4.0 | ≥ 3.7 | 2021-05-14 | non maintenue |
 
-Le dépôt fige `returns = "^0.27.0"` alors que la 0.30.0 existe. Les tests du module 02 et du module 03 passent en 3.14.7 avec la version figée.
+Le dépôt utilise `returns = "^0.30.0"`. Les tests des modules 01, 02, 03 et 04 donnent les mêmes résultats en 3.14.7 avec la 0.27 et la 0.30 (les échecs des tests de démonstration du module 01 et 04 sont volontaires). Les comptes d'erreurs `mypy` et `pyright` des configs des modules 01 et 02 sont identiques entre les deux versions.
+
+### Côté C# : les unions arrivent dans le langage
+
+C# 15 (.NET 11) ajoute le mot-clé `union`, avec conversions implicites depuis chaque type de cas et `switch` vérifié par le compilateur. Source : [What's new in C# 15](https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/csharp-15).
+
+```csharp
+public union Pet(Cat, Dog, Bird);
+```
+
+C'est l'équivalent de `Ok[T] | Error[E]` en Python. Une bibliothèque comme `OneOf` devient inutile pour ce besoin. La page ne précise ni la sortie finale ni le coût de boxing des cas structs : à vérifier avant de s'en servir en production.
 
 ### Sans bibliothèque
 
